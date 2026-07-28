@@ -11,6 +11,9 @@
   let requiredChannelId = $state('');
   let requiredChannelLink = $state('');
 
+  let warrantyUploadTimeoutMinutes = $state(5);
+  let adminProcessBusyTimeoutMinutes = $state(10);
+
   let isMaintenance = $state(false);
   let maintenanceMsg = $state('');
 
@@ -31,6 +34,8 @@
       mustJoinEnabled = settingsRes.data.mustJoinEnabled !== false;
       requiredChannelId = settingsRes.data.requiredChannelId || '';
       requiredChannelLink = settingsRes.data.requiredChannelLink || '';
+      warrantyUploadTimeoutMinutes = settingsRes.data.warrantyUploadTimeoutMinutes || 5;
+      adminProcessBusyTimeoutMinutes = settingsRes.data.adminProcessBusyTimeoutMinutes || 10;
     }
 
     if (mainRes.success && mainRes.data) {
@@ -52,10 +57,12 @@
       method: 'POST',
       body: JSON.stringify({ 
         storeName, storeLogoUrl, contactWhatsapp, contactTelegram, groupTelegram, 
-        mustJoinEnabled, requiredChannelId, requiredChannelLink 
+        mustJoinEnabled, requiredChannelId, requiredChannelLink,
+        warrantyUploadTimeoutMinutes: Number(warrantyUploadTimeoutMinutes || 5),
+        adminProcessBusyTimeoutMinutes: Number(adminProcessBusyTimeoutMinutes || 10)
       })
     });
-    alert('Pengaturan toko, CS & Wajib Join Channel berhasil disimpan!');
+    alert('Pengaturan toko, CS, Wajib Join & Waktu Garansi berhasil disimpan!');
   }
 </script>
 
@@ -101,6 +108,23 @@
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Link Group Telegram</label>
         <input type="text" bind:value={groupTelegram} placeholder="t.me/panzzstoreeid" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+      </div>
+    </div>
+  </div>
+
+  <!-- Warranty Timers Configurator -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+    <h3 class="font-bold text-base text-white">🛡️ Batas Waktu & Notifikasi Garansi</h3>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-slate-400 font-semibold block mb-1">⏳ Batas Waktu Unggah Foto Bukti (Menit)</label>
+        <input type="number" min="1" bind:value={warrantyUploadTimeoutMinutes} placeholder="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-bold focus:border-amber-500 focus:outline-none">
+        <span class="text-[10px] text-slate-500 block mt-0.5">Setelah klik tombol 'Klaim Garansi', pembeli harus selesai kirim foto dalam waktu ini atau garansi hangus.</span>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 font-semibold block mb-1">⏱️ Waktu Respon Admin Sibuk (Menit)</label>
+        <input type="number" min="1" bind:value={adminProcessBusyTimeoutMinutes} placeholder="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-sky-300 font-bold focus:border-sky-500 focus:outline-none">
+        <span class="text-[10px] text-slate-500 block mt-0.5">Jika admin belum merespon laporan garansi dalam kurun waktu ini, bot otomatis kirim pesan "Admin sedang sibuk".</span>
       </div>
     </div>
   </div>

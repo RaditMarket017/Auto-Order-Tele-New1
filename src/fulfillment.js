@@ -1,4 +1,4 @@
-const { db } = require('./firebase');
+const { db, admin } = require('./firebase');
 const { Telegraf, Markup } = require('telegraf');
 const { formatIDR, escapeHTML } = require('./helpers');
 const config = require('./config');
@@ -208,15 +208,39 @@ async function fulfillOrder(orderId) {
 }
 
 /**
+ * Helper to format credential item
+ */
+function formatCredentialItem(credText, index) {
+  const raw = (credText || '').toString().trim();
+  if (!raw) return `Data ${index + 1}:\n-`;
+
+  if (raw.includes('|')) {
+    const parts = raw.split('|').map(s => s.trim());
+    if (parts.length >= 3) {
+      return `Data ${index + 1}:\nUsername: ${parts[0]}\nE-mail: ${parts[1]}\nPassword: ${parts[2]}`;
+    } else if (parts.length === 2) {
+      return `Data ${index + 1}:\nE-mail: ${parts[0]}\nPassword: ${parts[1]}`;
+    }
+  }
+
+  return `Data ${index + 1}:\n${raw}`;
+}
+
+function formatAllCredentialsText(credentials) {
+  return credentials.map((c, i) => formatCredentialItem(c, i)).join('\n\n----------------------------------------\n\n');
+}
+
+/**
  * Auto-fulfill from credentials pool
  */
 async function autoFulfill(orderId, order, orderRef) {
   try {
+    const qty = order.quantity || 1;
     const poolSnap = await db.collection('credentials_pool')
       .where('productId', '==', order.productId)
       .where('variantLabel', '==', order.variantLabel)
       .where('isUsed', '==', false)
-      .limit(order.quantity || 1)
+      .limit(qty)
       .get();
 
     if (poolSnap.empty) {
@@ -246,15 +270,64 @@ async function autoFulfill(orderId, order, orderRef) {
 
     const credText = credentials.join('\n');
 
+    let variantNotes = '';
+    let warrantyDays = Number(order.warrantyDays || 0);
+    let renewEnabled = Boolean(order.renewEnabled);
+    let maxRenew = Number(order.maxRenew || 1);
+    let renewDelayDays = Number(order.renewDelayDays || 0);
+
+    if (order.productId) {
+      try {
+        const pDoc = await db.collection('products').doc(order.productId).get();
+        if (pDoc.exists) {
+          const pData = pDoc.data();
+          const variant = (pData.variants || []).find(v => v.label === order.variantLabel) || pData.variants?.[0];
+          if (variant) {
+            if (variant.warrantyDays !== undefined) warrantyDays = Number(variant.warrantyDays || 0);
+            if (variant.renewEnabled !== undefined) renewEnabled = Boolean(variant.renewEnabled);
+            if (variant.maxRenew !== undefined) maxRenew = Number(variant.maxRenew || 1);
+            if (variant.renewDelayDays !== undefined) renewDelayDays = Number(variant.renewDelayDays || 0);
+            if (variant.notes) variantNotes = variant.notes.trim();
+          }
+        }
+      } catch (e) {}
+    }
+
+    const deliveredAt = new Date().toISOString();
+
     await orderRef.update({
       status: 'success',
       credentials: credText,
-      deliveredAt: new Date().toISOString(),
+      deliveredAt,
+      warrantyDays,
+      renewEnabled,
+      maxRenew,
+      renewDelayDays,
+      renewCount: order.renewCount || 0,
     });
+
+    const updatedOrder = {
+      ...order,
+      id: orderId,
+      status: 'success',
+      deliveredAt,
+      warrantyDays,
+      renewEnabled,
+      maxRenew,
+      renewDelayDays,
+      renewCount: order.renewCount || 0,
+    };
+
+    if (order.productId) {
+      db.collection('products').doc(order.productId).update({
+        totalSold: admin.firestore.FieldValue.increment(order.quantity || 1)
+      }).catch(() => {});
+    }
 
     // Send to user
     if (order.telegramUserId) {
       const { t } = require('./i18n');
+      const { buildOrderActionButtons } = require('./handlers/warranty-renew');
 
       // Check if product requires customer email invite
       let requiresEmail = Boolean(order.requiresEmail);
@@ -266,42 +339,56 @@ async function autoFulfill(orderId, order, orderRef) {
       }
 
       let extraMsg = '';
-      let replyOptions = { parse_mode: 'HTML' };
+      const actionButtons = buildOrderActionButtons(updatedOrder);
+      let inlineButtons = [];
 
       if (requiresEmail) {
         extraMsg = '\n\n📧 <i>Produk ini membutuhkan email untuk proses invite. Silakan klik tombol <b>"📧 Kirim Email"</b> di bawah:</i>';
-        replyOptions = {
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('📧 Kirim Email', `input_invite_email_${orderId}`)],
-          ]),
-        };
+        inlineButtons.push([Markup.button.callback('📧 Kirim Email', `input_invite_email_${orderId}`)]);
+      }
+      if (actionButtons.length > 0) {
+        inlineButtons = inlineButtons.concat(actionButtons);
       }
 
-      // Text notification
-      await bot.telegram.sendMessage(order.telegramUserId,
-        t('id', 'payment_success', {
-          orderId: escapeHTML(orderId),
-          product: escapeHTML(order.productName),
-          variant: escapeHTML(order.variantLabel),
-          total: formatIDR(order.totalPrice),
-          method: order.paymentMethod === 'saldo' ? 'Saldo' : 'QRIS',
-        }) + extraMsg,
-        replyOptions
-      ).catch(() => {});
+      let replyOptions = { parse_mode: 'HTML' };
+      if (inlineButtons.length > 0) {
+        replyOptions = { parse_mode: 'HTML', ...Markup.inlineKeyboard(inlineButtons) };
+      }
 
-      // Send as .txt file
-      const fileBuffer = Buffer.from(credText, 'utf-8');
-      await bot.telegram.sendDocument(order.telegramUserId,
-        { source: fileBuffer, filename: `akun_${orderId}.txt` },
-        { caption: `📄 Detail Akun: ${order.productName}` }
-      ).catch((err) => {
-        // Fallback: send as text
-        bot.telegram.sendMessage(order.telegramUserId,
-          `🔑 <b>Detail Akun:</b>\n<pre>${escapeHTML(credText)}</pre>`,
-          { parse_mode: 'HTML' }
+      const formattedCredsText = formatAllCredentialsText(credentials);
+
+      if (qty === 1) {
+        // Quantity = 1: Send as TEXT MESSAGE directly
+        let msgText = `🔑 <b>DATA PESANAN ANDA:</b>\n\n${escapeHTML(formatCredentialItem(credentials[0], 0))}\n\n✅ <b>ORDER BERHASIL</b>`;
+        if (variantNotes) {
+          msgText += `\n\n${escapeHTML(variantNotes)}`;
+        }
+        msgText += extraMsg;
+
+        await bot.telegram.sendMessage(order.telegramUserId, msgText, replyOptions).catch(() => {});
+      } else {
+        // Quantity > 1: Send as .txt file document + text message
+        const fileBuffer = Buffer.from(formattedCredsText, 'utf-8');
+        await bot.telegram.sendDocument(order.telegramUserId,
+          { source: fileBuffer, filename: `pesanan_${orderId}.txt` },
+          { caption: `📄 <b>Detail Akun (${qty} Akun): ${escapeHTML(order.productName)}</b>`, parse_mode: 'HTML' }
         ).catch(() => {});
-      });
+
+        let msgText = `🎉 <b>ORDER BERHASIL (#${escapeHTML(orderId)})</b>\n` +
+          `────────────────────────────\n` +
+          `• <b>Produk</b> : <b>${escapeHTML(order.productName)}</b> (${escapeHTML(order.variantLabel)})\n` +
+          `• <b>Jumlah</b> : <b>${qty}</b> akun\n` +
+          `• <b>Total</b>  : <b>${formatIDR(order.totalPrice)}</b>\n` +
+          `────────────────────────────\n` +
+          `📄 <i>Detail akun pesanan Anda dikirimkan via file .txt di atas.</i>`;
+
+        if (variantNotes) {
+          msgText += `\n\n${escapeHTML(variantNotes)}`;
+        }
+        msgText += extraMsg;
+
+        await bot.telegram.sendMessage(order.telegramUserId, msgText, replyOptions).catch(() => {});
+      }
     }
 
     // Notify Admin on Instant Order Completion

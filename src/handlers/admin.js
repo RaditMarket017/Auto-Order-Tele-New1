@@ -77,11 +77,23 @@ async function showAdminMenu(ctx) {
 
     const buttons = [];
 
-    // Telegram requires HTTPS for Web App buttons
-    const activeUrl = process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+    // Telegram Inline Button logic (WebApp for HTTPS, URL Button for HTTP IP/Domain)
+    const activeUrl = process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+    const userId = ctx.from?.id || '';
+    let extraLinkText = '';
+
     if (activeUrl && activeUrl.startsWith('https://')) {
-      const webAppUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${ctx.from?.id || ''}&secret=${config.ADMIN_SECRET}`;
+      // Direct Telegram Mini App popup button
+      const webAppUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${userId}`;
       buttons.push([Markup.button.webApp('🖥️ Open Web Admin Mini App', webAppUrl)]);
+    } else if (activeUrl && !activeUrl.includes('localhost')) {
+      // Real Inline URL button for Public IP / HTTP domain
+      const targetUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${userId}`;
+      buttons.push([Markup.button.url('🖥️ Open Web Admin Mini App', targetUrl)]);
+    } else {
+      // Localhost fallback
+      const localUrl = `http://localhost:3001/admin?user_id=${userId}`;
+      extraLinkText = `\n\n🖥️ <b>Web Admin Dashboard (Browser):</b>\n<code>${localUrl}</code>`;
     }
 
     buttons.push([Markup.button.callback('📢 Broadcast', 'admin_broadcast'), Markup.button.callback('📧 TMail', 'tmail_menu')]);
@@ -91,11 +103,12 @@ async function showAdminMenu(ctx) {
     buttons.push([Markup.button.callback('↻ Refresh', 'admin_main')]);
 
     const keyboard = Markup.inlineKeyboard(buttons);
+    const finalMsg = msg + extraLinkText;
 
     if (ctx.updateType === 'callback_query') {
-      return ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+      return ctx.editMessageText(finalMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
     }
-    return ctx.reply(msg, { parse_mode: 'HTML', ...keyboard });
+    return ctx.reply(finalMsg, { parse_mode: 'HTML', ...keyboard });
   } catch (err) {
     console.error('Admin Dashboard Error:', err);
     ctx.reply('❌ Gagal memuat admin dashboard.');

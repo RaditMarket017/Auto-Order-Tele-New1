@@ -19,6 +19,7 @@ const { showOrderSummary, adjustQuantity } = require('./src/handlers/orders');
 const { handleBalancePayment, handleQRISPayment, handleTopupQRIS, checkPaymentStatus, cancelOrder, handleApproveOrder, handleRejectOrder } = require('./src/handlers/payments');
 const { showAdminMenu, handleAdminAction, handleAdmAction, handleAdminText, handleAdminDocument, clearAdminSession } = require('./src/handlers/admin');
 const { showTMailMenu, handleTMailAction } = require('./src/handlers/tmail-handler');
+const { registerWarrantyRenewHandlers, getWarrantyInfo, getRenewInfo, buildOrderActionButtons } = require('./src/handlers/warranty-renew');
 const { createWebhookServer } = require('./src/webhook');
 
 // Telegraf options (Proxy support)
@@ -33,6 +34,7 @@ if (process.env.TELEGRAM_PROXY) {
 }
 
 const bot = new Telegraf(config.BOT_TOKEN, botOptions);
+registerWarrantyRenewHandlers(bot);
 
 // ═══════════════════════════════════════
 // HELPERS
@@ -74,16 +76,18 @@ async function registerUser(ctx) {
     await userRef.update({
       firstName: ctx.from.first_name || '',
       username: ctx.from.username || '',
-    }).catch(() => {});
+    }).catch(() => { });
   }
 }
 
 function getReplyKeyboard(lang) {
   const rows = [];
 
-  // Telegram requires HTTPS for Web App buttons
-  if (config.WEBHOOK_BASE_URL && config.WEBHOOK_BASE_URL.startsWith('https://')) {
-    const shopAppUrl = `${config.WEBHOOK_BASE_URL.replace(/\/$/, '')}/app`;
+  const activeUrl = process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+
+  // Telegram requires HTTPS for Web App buttons on Reply Keyboard
+  if (activeUrl && activeUrl.startsWith('https://')) {
+    const shopAppUrl = `${activeUrl.replace(/\/$/, '')}/app`;
     rows.push([Markup.button.webApp('📱 Shop Mini App', shopAppUrl)]);
   }
 
@@ -118,7 +122,7 @@ async function checkChannelSubscription(ctx) {
       if (data.requiredChannelId) channelId = data.requiredChannelId;
       if (data.requiredChannelLink) channelLink = data.requiredChannelLink;
     }
-  } catch (err) {}
+  } catch (err) { }
 
   if (!channelId) return true;
 
@@ -150,10 +154,10 @@ async function checkChannelSubscription(ctx) {
   ]);
 
   if (ctx.callbackQuery) {
-    await ctx.answerCbQuery('⚠️ Anda belum bergabung ke Channel!', { show_alert: true }).catch(() => {});
-    await ctx.reply(gateMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    await ctx.answerCbQuery('⚠️ Anda belum bergabung ke Channel!', { show_alert: true }).catch(() => { });
+    await ctx.reply(gateMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => { });
   } else {
-    await ctx.reply(gateMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    await ctx.reply(gateMsg, { parse_mode: 'HTML', ...keyboard }).catch(() => { });
   }
 
   return false;
@@ -193,7 +197,7 @@ async function sendWelcomeMessage(ctx) {
     if (storeDoc.exists && storeDoc.data().bannerUrl) {
       bannerUrl = storeDoc.data().bannerUrl;
     }
-  } catch {}
+  } catch { }
 
   if (bannerUrl) {
     try {
@@ -227,8 +231,8 @@ bot.start(async (ctx) => {
 bot.action('verify_channel_sub', async (ctx) => {
   const isJoined = await checkChannelSubscription(ctx);
   if (isJoined) {
-    await ctx.answerCbQuery('🎉 Terima kasih! Akses bot berhasil dibuka.', { show_alert: true }).catch(() => {});
-    await ctx.deleteMessage().catch(() => {});
+    await ctx.answerCbQuery('🎉 Terima kasih! Akses bot berhasil dibuka.', { show_alert: true }).catch(() => { });
+    await ctx.deleteMessage().catch(() => { });
     await sendWelcomeMessage(ctx);
   }
 });
@@ -357,7 +361,23 @@ async function showStockStatus(ctx) {
 
   try {
     const snap = await db.collection('products').orderBy('order', 'asc').get();
-    const products = snap.docs.map(d => ({ ...d.data() })).filter(p => p.isVisible !== false);
+    const products = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.isVisible !== false);
+
+    // Calculate accurate stock from credentials_pool or variants
+    const poolSnap = await db.collection('credentials_pool').where('isUsed', '==', false).get();
+    const stockMap = {};
+    poolSnap.forEach(d => {
+      const pId = d.data().productId;
+      stockMap[pId] = (stockMap[pId] || 0) + 1;
+    });
+
+    products.forEach(p => {
+      if (!p.requiresEmail) {
+        p.stock = stockMap[p.id] || 0;
+      } else {
+        p.stock = (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+      }
+    });
 
     let msg = t(lang, 'stock_title') + '\n';
 
@@ -417,14 +437,19 @@ async function showPopularProducts(ctx) {
   const lang = await getUserLang(ctx.from.id);
 
   try {
-    const snap = await db.collection('products').orderBy('totalSold', 'desc').limit(5).get();
-    if (snap.empty) return ctx.reply(t(lang, 'popular_empty'), { parse_mode: 'HTML' });
+    const snap = await db.collection('products').get();
+    let products = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.isVisible !== false);
+
+    if (products.length === 0) return ctx.reply(t(lang, 'popular_empty'), { parse_mode: 'HTML' });
+
+    // Sort by totalSold descending
+    products.sort((a, b) => (b.totalSold || 0) - (a.totalSold || 0));
+    products = products.slice(0, 5);
 
     let msg = t(lang, 'popular_title') + '\n';
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
 
-    snap.docs.forEach((doc, i) => {
-      const p = doc.data();
+    products.forEach((p, i) => {
       msg += t(lang, 'popular_item', {
         medal: medals[i] || `${i + 1}.`,
         name: escapeHTML(p.name),
@@ -434,6 +459,7 @@ async function showPopularProducts(ctx) {
 
     return ctx.reply(msg, { parse_mode: 'HTML' });
   } catch (err) {
+    console.error('Popular products error:', err);
     ctx.reply(t(lang, 'popular_empty'), { parse_mode: 'HTML' });
   }
 }
@@ -454,7 +480,7 @@ async function showHelpMenu(ctx) {
   ]);
 
   if (ctx.updateType === 'callback_query') {
-    return ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    return ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => { });
   }
   return ctx.reply(msg, { parse_mode: 'HTML', ...keyboard });
 }
@@ -467,7 +493,7 @@ bot.on('callback_query', async (ctx) => {
   const data = ctx.callbackQuery.data || '';
 
   // Noop
-  if (data === 'noop') return ctx.answerCbQuery().catch(() => {});
+  if (data === 'noop') return ctx.answerCbQuery().catch(() => { });
 
   // ─── Products ───
   if (data.startsWith('page_')) {
@@ -517,8 +543,8 @@ bot.on('callback_query', async (ctx) => {
   }
   if (data === 'cancel_cart') {
     await clearCart(ctx.from.id);
-    ctx.answerCbQuery('✕ Dibatalkan.').catch(() => {});
-    return ctx.deleteMessage().catch(() => {});
+    ctx.answerCbQuery('✕ Dibatalkan.').catch(() => { });
+    return ctx.deleteMessage().catch(() => { });
   }
 
   // ─── Topup ───
@@ -531,7 +557,7 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'apply_voucher') {
     const { updateSession } = require('./src/session');
     const summaryMsgId = ctx.callbackQuery?.message?.message_id;
-    ctx.answerCbQuery().catch(() => {});
+    ctx.answerCbQuery().catch(() => { });
     const promptMsg = await ctx.reply('<b>🎟 Kirim Kode Voucher:</b>', { parse_mode: 'HTML' });
     await updateSession(ctx.from.id, {
       awaitingVoucher: true,
@@ -556,11 +582,13 @@ bot.on('callback_query', async (ctx) => {
       .slice(0, 5);
 
     if (docs.length === 0) {
-      ctx.answerCbQuery(t(lang, 'history_no_orders'), { show_alert: true }).catch(() => {});
+      ctx.answerCbQuery(t(lang, 'history_no_orders'), { show_alert: true }).catch(() => { });
       return;
     }
 
     let msg = t(lang, 'history_orders_title') + '\n';
+    const buttons = [];
+
     docs.forEach(o => {
       const statusMap = { success: '✅', pending: '⏳', failed: '❌', processing: '⚙️' };
       msg += t(lang, 'history_order_item', {
@@ -568,13 +596,73 @@ bot.on('callback_query', async (ctx) => {
         total: formatIDR(o.totalPrice || 0),
         status: statusMap[o.status] || o.status,
       }) + '\n';
+      buttons.push([Markup.button.callback(`📄 Detail: ${o.productName || 'Order'} (#${o.id.slice(-6)})`, `order_detail_${o.id}`)]);
     });
 
-    ctx.answerCbQuery().catch(() => {});
+    buttons.push([Markup.button.callback(t(lang, 'btn_back'), 'back_history')]);
+
+    ctx.answerCbQuery().catch(() => { });
     return ctx.editMessageText(msg, {
       parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'btn_back'), 'back_history')]]),
-    }).catch(() => {});
+      ...Markup.inlineKeyboard(buttons),
+    }).catch(() => { });
+  }
+
+  // ─── Order Detail View ───
+  if (data.startsWith('order_detail_')) {
+    const orderId = data.replace('order_detail_', '');
+    ctx.answerCbQuery().catch(() => {});
+
+    try {
+      const doc = await db.collection('orders').doc(orderId).get();
+      if (!doc.exists) return ctx.reply('❌ Order tidak ditemukan.');
+      const order = { id: doc.id, ...doc.data() };
+
+      const warrantyInfo = getWarrantyInfo(order);
+      const renewInfo = getRenewInfo(order);
+
+      let msg = `<b>📦 DETAIL PESANAN #${escapeHTML(order.id)}</b>\n`;
+      msg += `────────────────────────────\n`;
+      msg += `• <b>Produk</b>    : <b>${escapeHTML(order.productName || '-')}</b> (${escapeHTML(order.variantLabel || '-')})\n`;
+      msg += `• <b>Total</b>     : <b>${formatIDR(order.totalPrice || 0)}</b> (${order.paymentMethod === 'saldo' ? 'Saldo' : 'QRIS'})\n`;
+      msg += `• <b>Status</b>    : <b>${(order.status || 'unknown').toUpperCase()}</b>\n`;
+
+      if (warrantyInfo.hasWarranty) {
+        if (warrantyInfo.alreadyClaimed) {
+          msg += `• <b>🛡️ Garansi</b> : <b>Sudah Diklaim (1x)</b>\n`;
+        } else if (warrantyInfo.isExpired) {
+          msg += `• <b>🛡️ Garansi</b> : <b>Expired</b>\n`;
+        } else {
+          msg += `• <b>🛡️ Garansi</b> : <b>Aktif (${warrantyInfo.remainingStr})</b>\n`;
+        }
+      }
+
+      if (renewInfo.renewEnabled) {
+        if (renewInfo.isMaxReached) {
+          msg += `• <b>🔄 Renew</b>   : <b>Selesai (${renewInfo.renewCount}/${renewInfo.maxRenew}x)</b>\n`;
+        } else if (renewInfo.isReady) {
+          msg += `• <b>🔄 Renew</b>   : <b>Tersedia (${renewInfo.renewCount + 1}/${renewInfo.maxRenew}x)</b>\n`;
+        } else {
+          msg += `• <b>🔄 Renew</b>   : <b>Tungggu (${renewInfo.waitStr})</b>\n`;
+        }
+      }
+
+      if (order.credentials) {
+        msg += `────────────────────────────\n`;
+        msg += `🔑 <b>Detail Akun Terakhir:</b>\n<pre>${escapeHTML(order.credentials)}</pre>\n`;
+      }
+
+      const actionButtons = buildOrderActionButtons(order);
+      actionButtons.push([Markup.button.callback('⬅️ Kembali ke Riwayat', 'history_orders')]);
+
+      return ctx.editMessageText(msg, {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard(actionButtons),
+      }).catch(() => {});
+    } catch (err) {
+      console.error('order_detail error:', err);
+      return ctx.reply('❌ Gagal memuat detail pesanan.');
+    }
   }
 
   if (data === 'history_topup') {
@@ -591,7 +679,7 @@ bot.on('callback_query', async (ctx) => {
       .slice(0, 5);
 
     if (docs.length === 0) {
-      ctx.answerCbQuery(t(lang, 'history_no_topup'), { show_alert: true }).catch(() => {});
+      ctx.answerCbQuery(t(lang, 'history_no_topup'), { show_alert: true }).catch(() => { });
       return;
     }
 
@@ -605,11 +693,11 @@ bot.on('callback_query', async (ctx) => {
       }) + '\n';
     });
 
-    ctx.answerCbQuery().catch(() => {});
+    ctx.answerCbQuery().catch(() => { });
     return ctx.editMessageText(msg, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'btn_back'), 'back_history')]]),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   if (data === 'back_history') {
@@ -619,7 +707,7 @@ bot.on('callback_query', async (ctx) => {
   // ─── Help ───
   if (data === 'help_language') {
     const lang = await getUserLang(ctx.from.id);
-    ctx.answerCbQuery().catch(() => {});
+    ctx.answerCbQuery().catch(() => { });
     return ctx.editMessageText(t(lang, 'help_lang_title'), {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
@@ -629,13 +717,13 @@ bot.on('callback_query', async (ctx) => {
         ],
         [Markup.button.callback(t(lang, 'btn_back'), 'back_help')],
       ]),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   if (data === 'set_lang_id' || data === 'set_lang_en') {
     const newLang = data === 'set_lang_id' ? 'id' : 'en';
     await db.collection('bot_users').doc(ctx.from.id.toString()).update({ language: newLang });
-    ctx.answerCbQuery(t(newLang, 'lang_changed')).catch(() => {});
+    ctx.answerCbQuery(t(newLang, 'lang_changed')).catch(() => { });
 
     // Update keyboard
     ctx.reply(t(newLang, 'lang_changed'), { parse_mode: 'HTML', ...getReplyKeyboard(newLang) });
@@ -644,7 +732,7 @@ bot.on('callback_query', async (ctx) => {
 
   if (data === 'help_contact') {
     const lang = await getUserLang(ctx.from.id);
-    ctx.answerCbQuery().catch(() => {});
+    ctx.answerCbQuery().catch(() => { });
 
     const buttons = [];
     if (config.CONTACT_WHATSAPP) {
@@ -661,7 +749,7 @@ bot.on('callback_query', async (ctx) => {
     return ctx.editMessageText(t(lang, 'help_contact_title'), {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard(buttons),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   if (data === 'back_help') {
@@ -692,11 +780,11 @@ bot.on('callback_query', async (ctx) => {
   // ─── Ping admin ───
   if (data.startsWith('ping_admin_')) {
     const orderId = data.replace('ping_admin_', '');
-    ctx.answerCbQuery('📤 Pengingat terkirim!').catch(() => {});
+    ctx.answerCbQuery('📤 Pengingat terkirim!').catch(() => { });
     bot.telegram.sendMessage(config.ADMIN_ID,
       `🔔 Member <b>${escapeHTML(ctx.from.first_name)}</b> mengingatkan order <code>${escapeHTML(orderId)}</code>`,
       { parse_mode: 'HTML' }
-    ).catch(() => {});
+    ).catch(() => { });
     return;
   }
 
@@ -705,29 +793,29 @@ bot.on('callback_query', async (ctx) => {
     const orderId = data.replace('input_invite_email_', '');
     const { updateSession } = require('./src/session');
 
-    const promptMsg = await ctx.reply('📧 <b>Silakan kirim email yang ingin diinvite:</b>', { parse_mode: 'HTML' }).catch(() => {});
+    const promptMsg = await ctx.reply('📧 <b>Silakan kirim email yang ingin diinvite:</b>', { parse_mode: 'HTML' }).catch(() => { });
 
     await updateSession(ctx.from.id, {
       inviteState: 'WAITING_INVITE_EMAIL',
       inviteOrderId: orderId,
       invitePromptMsgId: promptMsg?.message_id,
     });
-    return ctx.answerCbQuery().catch(() => {});
+    return ctx.answerCbQuery().catch(() => { });
   }
 
   if (data.startsWith('invite_done_')) {
     const orderId = data.replace('invite_done_', '');
     const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
-    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin yang dapat mengakses ini.').catch(() => {});
+    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin yang dapat mengakses ini.').catch(() => { });
 
     const orderRef = db.collection('orders').doc(orderId);
     const orderDoc = await orderRef.get();
-    if (!orderDoc.exists) return ctx.answerCbQuery('Order tidak ditemukan.').catch(() => {});
+    if (!orderDoc.exists) return ctx.answerCbQuery('Order tidak ditemukan.').catch(() => { });
 
     const orderData = orderDoc.data();
     await orderRef.update({ inviteStatus: 'done', status: 'success' });
 
-    ctx.answerCbQuery('✅ Status Invite diubah ke Done!').catch(() => {});
+    ctx.answerCbQuery('✅ Status Invite diubah ke Done!').catch(() => { });
 
     const updatedOwnerMsg =
       `✅ <b>EMAIL INVITE PROSES SELESAI</b>\n` +
@@ -738,7 +826,7 @@ bot.on('callback_query', async (ctx) => {
       `📧 <b>Email</b>    : <code>${escapeHTML(orderData.inviteEmail || '-')}</code>\n\n` +
       `Status : ✅ <b>Done (Selesai)</b>`;
 
-    await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => {});
+    await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
 
     if (orderData.telegramUserId && orderData.telegramUserId !== 'guest') {
       const customerMsg =
@@ -750,10 +838,10 @@ bot.on('callback_query', async (ctx) => {
 
       if (orderData.customerMsgId) {
         await bot.telegram.editMessageText(orderData.telegramUserId, orderData.customerMsgId, null, customerMsg, { parse_mode: 'HTML' }).catch(() => {
-          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => {});
+          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
         });
       } else {
-        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => {});
+        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
       }
     }
 
@@ -767,11 +855,11 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('reinvite_email_')) {
     const orderId = data.replace('reinvite_email_', '');
     const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
-    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin.').catch(() => {});
+    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin.').catch(() => { });
 
     const orderRef = db.collection('orders').doc(orderId);
     const orderDoc = await orderRef.get();
-    if (!orderDoc.exists) return ctx.answerCbQuery('Order tidak ditemukan.').catch(() => {});
+    if (!orderDoc.exists) return ctx.answerCbQuery('Order tidak ditemukan.').catch(() => { });
 
     const orderData = orderDoc.data();
     await orderRef.update({
@@ -779,7 +867,7 @@ bot.on('callback_query', async (ctx) => {
       updatedAt: new Date().toISOString(),
     });
 
-    ctx.answerCbQuery('🔄 Permintaan pengisian ulang email terkirim!').catch(() => {});
+    ctx.answerCbQuery('🔄 Permintaan pengisian ulang email terkirim!').catch(() => { });
 
     const updatedOwnerMsg =
       `🔄 <b>MINTA REVISI EMAIL TERKIRIM</b>\n` +
@@ -789,7 +877,7 @@ bot.on('callback_query', async (ctx) => {
       `📧 <b>Email Lama</b>: <code>${escapeHTML(orderData.inviteEmail || '-')}</code>\n\n` +
       `Status : ⏳ <b>Menunggu Customer Memasukkan Email Baru</b>`;
 
-    await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => {});
+    await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
 
     if (orderData.telegramUserId && orderData.telegramUserId !== 'guest') {
       const customerMsg =
@@ -806,10 +894,10 @@ bot.on('callback_query', async (ctx) => {
 
       if (orderData.customerMsgId) {
         await bot.telegram.editMessageText(orderData.telegramUserId, orderData.customerMsgId, null, customerMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => {
-          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => {});
+          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => { });
         });
       } else {
-        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => {});
+        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => { });
       }
     }
     return;
@@ -818,12 +906,12 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('invite_cancel_')) {
     const orderId = data.replace('invite_cancel_', '');
     const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
-    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin.').catch(() => {});
+    if (!isAdmin) return ctx.answerCbQuery('❌ Hanya admin.').catch(() => { });
 
     const orderDoc = await db.collection('orders').doc(orderId).get();
     const orderData = orderDoc.exists ? orderDoc.data() : {};
 
-    ctx.answerCbQuery().catch(() => {});
+    ctx.answerCbQuery().catch(() => { });
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('🔄 Minta Kirim Ulang Email', `reinvite_email_${orderId}`)],
       [Markup.button.callback('📦 Stok Habis', `cancel_reason_${orderId}_Stok habis`)],
@@ -837,7 +925,7 @@ bot.on('callback_query', async (ctx) => {
       `📧 <b>Email</b>  : <code>${escapeHTML(orderData.inviteEmail || '-')}</code>\n\n` +
       `<i>Silakan pilih tindakan / alasan pembatalan di bawah:</i>`;
 
-    return ctx.editMessageText(promptCancelText, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    return ctx.editMessageText(promptCancelText, { parse_mode: 'HTML', ...keyboard }).catch(() => { });
   }
 
   if (data.startsWith('cancel_reason_')) {
@@ -847,7 +935,7 @@ bot.on('callback_query', async (ctx) => {
     const reasonType = raw.substring(firstUnderscore + 1);
 
     const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
-    if (!isAdmin) return ctx.answerCbQuery().catch(() => {});
+    if (!isAdmin) return ctx.answerCbQuery().catch(() => { });
 
     if (reasonType === 'custom') {
       const { updateSession } = require('./src/session');
@@ -856,20 +944,20 @@ bot.on('callback_query', async (ctx) => {
         cancelOrderId: orderId,
         cancelOwnerMsgId: ctx.callbackQuery?.message?.message_id,
       });
-      ctx.answerCbQuery().catch(() => {});
+      ctx.answerCbQuery().catch(() => { });
       return ctx.editMessageText(
         `✏️ <b>SILAKAN KETIK ALASAN PEMBATALAN</b>\n` +
         `────────────────────────────\n` +
         `🆔 <b>Order ID</b> : <code>#${escapeHTML(orderId)}</code>\n\n` +
         `<i>Ketik alasan pembatalan di kolom chat di bawah ini...</i>`,
         { parse_mode: 'HTML' }
-      ).catch(() => {});
+      ).catch(() => { });
     }
 
     return processCancelInvite(ctx, orderId, reasonType);
   }
 
-  ctx.answerCbQuery().catch(() => {});
+  ctx.answerCbQuery().catch(() => { });
 });
 
 async function processCancelInvite(ctx, orderId, reason, ownerMsgIdOverride = null) {
@@ -896,15 +984,15 @@ async function processCancelInvite(ctx, orderId, reason, ownerMsgIdOverride = nu
 
   if (ctx && ctx.editMessageText) {
     await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(async () => {
-      await ctx.reply(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => {});
+      await ctx.reply(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
     });
   } else if (ownerMsgIdOverride) {
     await bot.telegram.editMessageText(config.ADMIN_ID, ownerMsgIdOverride, null, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(async () => {
-      await bot.telegram.sendMessage(config.ADMIN_ID, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => {});
+      await bot.telegram.sendMessage(config.ADMIN_ID, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
     });
   } else if (orderData.ownerMsgId) {
     await bot.telegram.editMessageText(config.ADMIN_ID, orderData.ownerMsgId, null, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(async () => {
-      await bot.telegram.sendMessage(config.ADMIN_ID, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => {});
+      await bot.telegram.sendMessage(config.ADMIN_ID, updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
     });
   }
 
@@ -920,10 +1008,10 @@ async function processCancelInvite(ctx, orderId, reason, ownerMsgIdOverride = nu
 
     if (orderData.customerMsgId) {
       await bot.telegram.editMessageText(orderData.telegramUserId, orderData.customerMsgId, null, customerMsg, { parse_mode: 'HTML' }).catch(() => {
-        bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => {});
+        bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
       });
     } else {
-      await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => {});
+      await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
     }
   }
 }
@@ -954,13 +1042,13 @@ bot.on('text', async (ctx) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Delete customer text input and prompt message to keep chat clean
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(() => { });
     if (session.invitePromptMsgId) {
-      ctx.telegram.deleteMessage(ctx.chat.id, session.invitePromptMsgId).catch(() => {});
+      ctx.telegram.deleteMessage(ctx.chat.id, session.invitePromptMsgId).catch(() => { });
     }
 
     if (!emailRegex.test(emailText)) {
-      const errPrompt = await ctx.reply('❌ <b>Format email tidak valid.</b>\nSilakan masukkan email yang benar (contoh: <code>user@gmail.com</code>):', { parse_mode: 'HTML' }).catch(() => {});
+      const errPrompt = await ctx.reply('❌ <b>Format email tidak valid.</b>\nSilakan masukkan email yang benar (contoh: <code>user@gmail.com</code>):', { parse_mode: 'HTML' }).catch(() => { });
       await updateSession(ctx.from.id, { invitePromptMsgId: errPrompt?.message_id });
       return;
     }
@@ -973,7 +1061,7 @@ bot.on('text', async (ctx) => {
       inviteEmail: emailText,
       inviteStatus: 'pending',
       updatedAt: new Date().toISOString(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     const orderDoc = await db.collection('orders').doc(orderId).get();
     const orderData = orderDoc.exists ? orderDoc.data() : {};
@@ -993,10 +1081,10 @@ bot.on('text', async (ctx) => {
 
     if (orderData.customerMsgId) {
       await ctx.telegram.editMessageText(ctx.chat.id, orderData.customerMsgId, null, customerUpdatedMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(async () => {
-        await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => {});
+        await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => { });
       });
     } else {
-      await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => {});
+      await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML', ...customerKeyboard }).catch(() => { });
     }
 
     // Notify Owner (Admin)
@@ -1019,9 +1107,9 @@ bot.on('text', async (ctx) => {
         ],
       ]);
 
-      const sentOwnerMsg = await bot.telegram.sendMessage(config.ADMIN_ID, ownerMsg, { parse_mode: 'HTML', ...ownerKeyboard }).catch(() => {});
+      const sentOwnerMsg = await bot.telegram.sendMessage(config.ADMIN_ID, ownerMsg, { parse_mode: 'HTML', ...ownerKeyboard }).catch(() => { });
       if (sentOwnerMsg?.message_id) {
-        await db.collection('orders').doc(orderId).update({ ownerMsgId: sentOwnerMsg.message_id }).catch(() => {});
+        await db.collection('orders').doc(orderId).update({ ownerMsgId: sentOwnerMsg.message_id }).catch(() => { });
       }
     }
     return;
@@ -1032,13 +1120,13 @@ bot.on('text', async (ctx) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Delete customer text input and prompt message to keep chat clean
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(() => { });
     if (session.invitePromptMsgId) {
-      ctx.telegram.deleteMessage(ctx.chat.id, session.invitePromptMsgId).catch(() => {});
+      ctx.telegram.deleteMessage(ctx.chat.id, session.invitePromptMsgId).catch(() => { });
     }
 
     if (!emailRegex.test(emailText)) {
-      const errPrompt = await ctx.reply('❌ <b>Format email tidak valid.</b>\nSilakan masukkan email yang benar (contoh: <code>user@gmail.com</code>):', { parse_mode: 'HTML' }).catch(() => {});
+      const errPrompt = await ctx.reply('❌ <b>Format email tidak valid.</b>\nSilakan masukkan email yang benar (contoh: <code>user@gmail.com</code>):', { parse_mode: 'HTML' }).catch(() => { });
       await updateSession(ctx.from.id, { invitePromptMsgId: errPrompt?.message_id });
       return;
     }
@@ -1051,7 +1139,7 @@ bot.on('text', async (ctx) => {
       inviteEmail: emailText,
       inviteStatus: 'pending',
       updatedAt: new Date().toISOString(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     const orderDoc = await db.collection('orders').doc(orderId).get();
     const orderData = orderDoc.exists ? orderDoc.data() : {};
@@ -1067,10 +1155,10 @@ bot.on('text', async (ctx) => {
 
     if (orderData.customerMsgId) {
       await ctx.telegram.editMessageText(ctx.chat.id, orderData.customerMsgId, null, customerUpdatedMsg, { parse_mode: 'HTML' }).catch(async () => {
-        await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML' }).catch(() => {});
+        await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML' }).catch(() => { });
       });
     } else {
-      await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML' }).catch(() => {});
+      await ctx.reply(customerUpdatedMsg, { parse_mode: 'HTML' }).catch(() => { });
     }
 
     // Notify Owner (Admin)
@@ -1092,9 +1180,9 @@ bot.on('text', async (ctx) => {
         ],
       ]);
 
-      const sentOwnerMsg = await bot.telegram.sendMessage(config.ADMIN_ID, ownerMsg, { parse_mode: 'HTML', ...ownerKeyboard }).catch(() => {});
+      const sentOwnerMsg = await bot.telegram.sendMessage(config.ADMIN_ID, ownerMsg, { parse_mode: 'HTML', ...ownerKeyboard }).catch(() => { });
       if (sentOwnerMsg?.message_id) {
-        await db.collection('orders').doc(orderId).update({ ownerMsgId: sentOwnerMsg.message_id }).catch(() => {});
+        await db.collection('orders').doc(orderId).update({ ownerMsgId: sentOwnerMsg.message_id }).catch(() => { });
       }
     }
     return;
@@ -1107,7 +1195,7 @@ bot.on('text', async (ctx) => {
     const ownerMsgId = session.cancelOwnerMsgId;
 
     // Delete admin's typed text message to keep chat clean
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(() => { });
 
     await updateSession(ctx.from.id, { inviteState: null, cancelOrderId: null, cancelOwnerMsgId: null });
     await processCancelInvite(ctx, orderId, reason, ownerMsgId);
@@ -1119,9 +1207,9 @@ bot.on('text', async (ctx) => {
     const code = ctx.message.text.trim();
 
     // Clean up user text message and prompt message
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(() => { });
     if (session.voucherPromptMsgId) {
-      ctx.telegram.deleteMessage(ctx.chat.id, session.voucherPromptMsgId).catch(() => {});
+      ctx.telegram.deleteMessage(ctx.chat.id, session.voucherPromptMsgId).catch(() => { });
     }
 
     const { applyVoucher } = require('./src/pricing');
@@ -1196,7 +1284,7 @@ bot.on('photo', async (ctx) => {
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
-      await db.collection('admin_sessions').doc(ctx.from.id.toString()).delete().catch(() => {});
+      await db.collection('admin_sessions').doc(ctx.from.id.toString()).delete().catch(() => { });
       return ctx.reply('✅ Logo toko berhasil diupdate!');
     } catch (err) {
       console.error('Logo upload error:', err);
@@ -1231,9 +1319,9 @@ async function launch() {
 
   // Auto clean expired stock on startup & every 30 minutes
   const { cleanExpiredStock } = require('./src/stock-cleaner');
-  cleanExpiredStock().catch(() => {});
+  cleanExpiredStock().catch(() => { });
   setInterval(() => {
-    cleanExpiredStock().catch(() => {});
+    cleanExpiredStock().catch(() => { });
   }, 30 * 60 * 1000);
 
   // Start bot polling with retry

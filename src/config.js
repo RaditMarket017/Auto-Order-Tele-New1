@@ -23,7 +23,8 @@ module.exports = {
   REQUIRED_CHANNEL_LINK: process.env.REQUIRED_CHANNEL_LINK || process.env.GROUP_TELEGRAM || '',
 
   // Server
-  WEBHOOK_BASE_URL: process.env.WEBHOOK_BASE_URL || 'http://localhost:3001',
+  SERVER_URL: process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || '',
+  WEBHOOK_BASE_URL: process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || 'http://localhost:3001',
   PORT: parseInt(process.env.PORT) || 3001,
   ADMIN_SECRET: process.env.ADMIN_SECRET || 'secret',
 

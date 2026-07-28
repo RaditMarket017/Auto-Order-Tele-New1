@@ -217,12 +217,26 @@ router.post('/products', async (req, res) => {
     const computedBasePrice = basePrice || variants?.[0]?.price || 0;
     const computedStock = (variants || []).reduce((s, v) => s + Number(v.stock || 0), 0);
 
+    const sanitizedVariants = (variants || []).map(v => ({
+      label: v.label || 'Default',
+      price: Number(v.price || 0),
+      stock: Number(v.stock || 0),
+      warrantyDays: Number(v.warrantyDays || 0),
+      renewEnabled: Boolean(v.renewEnabled),
+      maxRenew: Number(v.maxRenew || 1),
+      renewDelayDays: Number(v.renewDelayDays || 0),
+      notes: v.notes || '',
+    }));
+    if (sanitizedVariants.length === 0) {
+      sanitizedVariants.push({ label: 'Default', price: computedBasePrice, stock: 0, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' });
+    }
+
     const docRef = await db.collection('products').add({
       name,
       description: description || '',
       basePrice: computedBasePrice,
       deliveryType: deliveryType || 'instant',
-      variants: variants || [{ label: 'Default', price: computedBasePrice, stock: 0 }],
+      variants: sanitizedVariants,
       wholesaleTiers: wholesaleTiers || [],
       imageUrl: imageUrl || '',
       apkName: name,
@@ -246,16 +260,31 @@ router.put('/products/:id', async (req, res) => {
     const computedBasePrice = basePrice || variants?.[0]?.price || 0;
     const computedStock = (variants || []).reduce((s, v) => s + Number(v.stock || 0), 0);
 
+    const sanitizedVariants = (variants || []).map(v => ({
+      label: v.label || 'Default',
+      price: Number(v.price || 0),
+      stock: Number(v.stock || 0),
+      warrantyDays: Number(v.warrantyDays || 0),
+      renewEnabled: Boolean(v.renewEnabled),
+      maxRenew: Number(v.maxRenew || 1),
+      renewDelayDays: Number(v.renewDelayDays || 0),
+      notes: v.notes || '',
+    }));
+    if (sanitizedVariants.length === 0) {
+      sanitizedVariants.push({ label: 'Default', price: computedBasePrice, stock: 0, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' });
+    }
+
     const updateData = {
-      name: name || '',
-      description: description || '',
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
       basePrice: computedBasePrice,
       deliveryType: deliveryType || 'instant',
-      variants: variants || [{ label: 'Default', price: computedBasePrice, stock: 0 }],
+      variants: sanitizedVariants,
       wholesaleTiers: wholesaleTiers || [],
-      imageUrl: imageUrl || '',
-      apkLogoUrl: apkLogoUrl || imageUrl || '',
+      ...(imageUrl !== undefined && { imageUrl }),
+      ...(apkLogoUrl !== undefined && { apkLogoUrl }),
       stock: computedStock,
+      ...(requiresEmail !== undefined && { requiresEmail: Boolean(requiresEmail) }),
       updatedAt: new Date().toISOString(),
     };
     if (requiresEmail !== undefined) updateData.requiresEmail = Boolean(requiresEmail);
