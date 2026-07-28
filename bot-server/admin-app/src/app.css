@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "Fira Code", monospace;
+  --color-violet-brand: #7c3aed;
+  --color-indigo-brand: #4f46e5;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+.no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+body {
+  background: #070913;
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 58, 237, 0.2), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 100% 100%, rgba(99, 102, 241, 0.12), transparent 60%);
+  color: #f8fafc;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+}

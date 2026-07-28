@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Admin Dashboard — Auto Order Bot</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"Fira Code"', 'monospace'],
+          },
+          colors: { brand: { 500: '#38bdf8', 600: '#0284c7' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-[#030712] text-slate-100 font-sans min-h-screen flex flex-col md:flex-row antialiased selection:bg-sky-500 selection:text-white bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-950/20 via-slate-950 to-slate-950">
+
+  <!-- Mobile Sticky Header -->
+  <header class="md:hidden sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2 font-extrabold text-sm text-sky-400">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+      Admin Panel
+    </div>
+    <button onclick="toggleSidebar()" class="w-9 h-9 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-center text-white active:scale-95 transition-all">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+    </button>
+  </header>
+
+  <!-- Mobile Sidebar Backdrop Overlay -->
+  <div id="sidebarOverlay" onclick="closeSidebar()" class="hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden"></div>
+
+  <!-- Sidebar Drawer -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shrink-0">
+    <div class="space-y-6">
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-2.5 font-extrabold text-base text-sky-400">
+        <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        Admin Panel
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="space-y-1">
+        <button onclick="switchNav(this, 'overview')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-white bg-sky-500">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          Ringkasan
+        </button>
+
+        <button onclick="switchNav(this, 'users')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Kelola Users
+        </button>
+
+        <button onclick="switchNav(this, 'products')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          Produk & Kelola Stok
+        </button>
+
+        <button onclick="switchNav(this, 'orders')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" x2="21" y1="6" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          Pesanan & Reports
+        </button>
+
+        <button onclick="switchNav(this, 'vouchers')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M9 9h.01"/><path d="M15 15h.01"/><path d="M15 9l-6 6"/></svg>
+          Voucher Promo
+        </button>
+
+        <button onclick="switchNav(this, 'tmail')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          TMail Generator
+        </button>
+
+        <button onclick="switchNav(this, 'settings')" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Pengaturan Toko & CS
+        </button>
+      </nav>
+    </div>
+
+    <!-- Store Status Pill -->
+    <div class="pt-6 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
+      <span>Auto Order Bot v1.0</span>
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <main class="flex-1 p-4 md:p-8 max-w-6xl w-full overflow-x-hidden space-y-6">
+
+    <!-- OVERVIEW VIEW -->
+    <div id="view-overview" class="view active space-y-6">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <h2 class="text-xl font-extrabold text-white tracking-tight">Dashboard Ringkasan</h2>
+        <button onclick="exportExcel()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          📊 Export Excel
+        </button>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1">
+          <span class="text-xs text-slate-400 font-semibold">Revenue Hari Ini</span>
+          <h3 id="stat-revenue" class="text-lg md:text-xl font-extrabold text-sky-400 truncate">Rp 0</h3>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1">
+          <span class="text-xs text-slate-400 font-semibold">Order Sukses</span>
+          <h3 id="stat-orders" class="text-lg md:text-xl font-extrabold text-sky-400">0</h3>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1">
+          <span class="text-xs text-slate-400 font-semibold">Total Member</span>
+          <h3 id="stat-users" class="text-lg md:text-xl font-extrabold text-sky-400">0</h3>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1">
+          <span class="text-xs text-slate-400 font-semibold">Total Produk</span>
+          <h3 id="stat-products" class="text-lg md:text-xl font-extrabold text-sky-400">0</h3>
+        </div>
+      </div>
+
+      <!-- Alert Stok Menipis Widget (Shown if stock <= 3) -->
+      <div id="dashboardLowStockBanner" class="hidden bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 font-bold text-lg">⚠️</div>
+          <div>
+            <h4 class="font-extrabold text-sm text-rose-400">Peringatan Stok Menipis / Habis!</h4>
+            <p id="dashboardLowStockText" class="text-xs text-slate-300 mt-0.5">Ada produk yang memerlukan isi ulang stok pool segera.</p>
+          </div>
+        </div>
+        <button onclick="switchNav(document.querySelector('[data-view=products]'), 'products')" class="px-3.5 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-500/20 transition-all">
+          📦 Kelola Stok Produk
+        </button>
+      </div>
+
+      <!-- Grid 2-Kolom: Chart Trend Penjualan 7 Hari & Top Selling Products -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        
+        <!-- Left 2 Cols: Sales Trend Chart 7 Days -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-lg flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                <span>📈</span> Trend Penjualan (7 Hari Terakhir)
+              </h3>
+              <p class="text-[11px] text-slate-400">Grafik omset harian toko Anda dalam seminggu.</p>
+            </div>
+            <span id="chartTotal7Days" class="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">Rp 0</span>
+          </div>
+
+          <!-- Custom Bar Chart Container -->
+          <div class="relative h-44 w-full pt-4 pb-2 flex items-end justify-between gap-2 border-b border-slate-800" id="salesChartContainer">
+            <!-- Populated by JS -->
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 px-1" id="salesChartLabels">
+            <!-- Labels populated by JS -->
+          </div>
+        </div>
+
+        <!-- Right 1 Col: Top Selling Products Leaderboard -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-lg flex flex-col justify-between">
+          <div>
+            <h3 class="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+              <span>🔥</span> Produk Terlaris
+            </h3>
+            <p class="text-[11px] text-slate-400">Top produk paling banyak dibeli.</p>
+          </div>
+
+          <div id="topProductsList" class="space-y-3 my-auto">
+            <p class="text-xs text-slate-500 text-center py-4">Memuat data produk terlaris...</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Section Transaksi Terbaru -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+              <span>⚡</span> Transaksi Terbaru
+            </h3>
+            <p class="text-[11px] text-slate-400">5 Transaksi terakhir yang masuk ke bot.</p>
+          </div>
+          <button onclick="switchNav(document.querySelector('[data-view=orders]'), 'orders')" class="text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors">
+            Lihat Semua Pesanan →
+          </button>
+        </div>
+
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left border-collapse text-xs whitespace-nowrap min-w-[500px]">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <th class="py-2.5 px-3">Order ID</th>
+                <th class="py-2.5 px-3">Pembeli</th>
+                <th class="py-2.5 px-3">Produk</th>
+                <th class="py-2.5 px-3">Total</th>
+                <th class="py-2.5 px-3">Metode</th>
+                <th class="py-2.5 px-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody id="table-recent-orders" class="divide-y divide-slate-800/60">
+              <tr><td colspan="6" class="py-4 text-center text-slate-500">Memuat transaksi terbaru...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS VIEW -->
+    <div id="view-users" class="view hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h3 class="font-bold text-base text-white">Daftar Pengguna / Member</h3>
+          <div class="w-full sm:w-64">
+            <input type="text" id="searchUser" oninput="filterUsers()" placeholder="Cari user (ID/Nama)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+        </div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left border-collapse text-xs min-w-[550px]">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">User ID</th>
+                <th class="py-3 px-3">Nama / Username</th>
+                <th class="py-3 px-3">Saldo</th>
+                <th class="py-3 px-3">Role</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3 text-right">Aksi Admin</th>
+              </tr>
+            </thead>
+            <tbody id="table-users" class="divide-y divide-slate-800/60">
+              <tr><td colspan="6" class="py-6 text-center text-slate-500">Memuat data user...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS & STOCK POOL VIEW -->
+    <div id="view-products" class="view hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="font-bold text-base text-white">Daftar Produk Digital</h3>
+            <p class="text-xs text-slate-400">Seluruh pesanan diproses secara <b class="text-emerald-400">INSTAN</b> otomatis oleh bot dari Stok Pool.</p>
+          </div>
+          <button onclick="openAddProductModal()" class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all flex items-center gap-1.5">
+            + Tambah Produk Baru
+          </button>
+        </div>
+
+        <div class="w-full overflow-x-auto no-scrollbar">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">Produk</th>
+                <th class="py-3 px-3">Stok Ready</th>
+                <th class="py-3 px-3">Butuh Email</th>
+                <th class="py-3 px-3 text-right">Kelola Stok & Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-products" class="divide-y divide-slate-800/60">
+              <tr><td colspan="4" class="py-6 text-center text-slate-500">Memuat data produk...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS VIEW -->
+    <div id="view-orders" class="view hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h3 class="font-bold text-base text-white">Riwayat Pesanan</h3>
+          <button onclick="exportExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all">
+            📊 Export Laporan Excel (.xlsx)
+          </button>
+        </div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left border-collapse text-xs min-w-[550px]">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">Order ID</th>
+                <th class="py-3 px-3">Pembeli</th>
+                <th class="py-3 px-3">Produk</th>
+                <th class="py-3 px-3">Total</th>
+                <th class="py-3 px-3">Metode</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-orders" class="divide-y divide-slate-800/60">
+              <tr><td colspan="7" class="py-6 text-center text-slate-500">Memuat pesanan...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOUCHERS VIEW -->
+    <div id="view-vouchers" class="view hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h3 class="font-bold text-base text-white">Voucher Promo</h3>
+          <button onclick="openAddVoucherModal()" class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all">
+            + Buat Voucher
+          </button>
+        </div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left border-collapse text-xs min-w-[500px]">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">Kode</th>
+                <th class="py-3 px-3">Tipe</th>
+                <th class="py-3 px-3">Nilai</th>
+                <th class="py-3 px-3">Penggunaan</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-vouchers" class="divide-y divide-slate-800/60">
+              <tr><td colspan="5" class="py-6 text-center text-slate-500">Memuat voucher...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TMAIL VIEW -->
+    <div id="view-tmail" class="view hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h3 class="font-bold text-base text-white">📧 TMail Generator (Admin)</h3>
+          <button onclick="generateTMail()" class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all">
+            ⚡ Generate Email
+          </button>
+        </div>
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-1">
+          <span class="text-[11px] text-slate-400">Email Aktif:</span>
+          <div id="tmail-active-address" class="text-sm font-bold text-sky-400 break-all">-</div>
+        </div>
+        <button onclick="checkTMailInbox()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl">
+          🔄 Refresh Inbox
+        </button>
+        <div class="space-y-2 pt-2">
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Surat Masuk</h4>
+          <div id="tmail-inbox-list" class="space-y-2">
+            <p class="text-xs text-slate-500">Belum ada email di-generate.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS & MAINTENANCE VIEW -->
+    <div id="view-settings" class="view hidden space-y-6">
+      <!-- Maintenance Mode Switch -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-base text-white">⚠️ Maintenance Mode</h3>
+            <p class="text-[11px] text-slate-400">Kunci bot sementara saat tutup toko / perbaikan.</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="maintenanceToggle" onchange="toggleMaintenanceMode()" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+          </label>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">Pesan Maintenance</label>
+          <input type="text" id="maintenanceMsg" placeholder="Bot sedang dalam pemeliharaan berkala..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Store & CS Configurator -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+        <h3 class="font-bold text-base text-white">📞 Pengaturan Toko & CS</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Nama Toko</label>
+            <input type="text" id="setting-store-name" placeholder="PanzzStore" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">URL Logo Toko / Banner</label>
+            <input type="text" id="setting-logo-url" placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Nomor WhatsApp CS</label>
+            <input type="text" id="setting-wa-cs" placeholder="628988999399" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Username Telegram CS</label>
+            <input type="text" id="setting-tele-cs" placeholder="miminpanz" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Link Group Telegram</label>
+            <input type="text" id="setting-group-tele" placeholder="t.me/panzzstoreeid" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- Required Channel Configurator -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-base text-white">📢 Wajib Join Channel</h3>
+            <p class="text-[11px] text-slate-400">Paksa pengguna bergabung channel sebelum transaksi.</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="mustJoinToggle" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+          </label>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Username / ID Channel Wajib Join</label>
+            <input type="text" id="setting-req-channel-id" placeholder="@panzzstoreeid atau -100xxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 font-semibold block mb-1">Link Join Channel (Undangan)</label>
+            <input type="text" id="setting-req-channel-link" placeholder="https://t.me/panzzstoreeid" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+          </div>
+          <button onclick="saveSettings()" class="w-full py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all">
+            Simpan Pengaturan
+          </button>
+        </div>
+      </div>
+    </div>
+
+  <!-- Modal Product (Unified Add / Edit & Stock Pool Manager) -->
+  <div id="modal-product" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-start sm:items-center justify-center p-3 sm:p-5 pt-6 sm:pt-8 pb-6 overflow-y-auto no-scrollbar">
+    <div class="w-full max-w-xl bg-slate-900 border border-slate-800/90 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl shadow-black/90 my-auto max-h-[85vh] flex flex-col overflow-hidden no-scrollbar">
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3.5 border-b border-slate-800/80 shrink-0">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-indigo-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0 shadow-lg shadow-sky-500/10">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          </div>
+          <div>
+            <h3 id="productModalTitle" class="font-extrabold text-base sm:text-lg text-white tracking-tight leading-snug">Edit Produk</h3>
+            <p id="productModalSubtitle" class="text-[11px] text-slate-400 font-medium">Kelola informasi produk, varian harga, dan sistem pengiriman.</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-product')" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition-all font-bold text-xs flex items-center justify-center">✕</button>
+      </div>
+
+      <input type="hidden" id="editingProductId">
+
+      <div class="space-y-3.5 flex-1 overflow-y-auto pr-1 no-scrollbar py-1">
+        
+        <!-- Section 1: Informasi Utama Produk -->
+        <div class="bg-gradient-to-b from-slate-950/80 to-slate-950/40 border border-slate-800/90 rounded-2xl p-4 space-y-3.5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-extrabold text-sky-400 uppercase tracking-wider block">📌 Informasi Utama Produk</span>
+          </div>
+          
+          <div>
+            <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Nama Produk <span class="text-rose-400">*</span></label>
+            <input type="text" id="prod-name" placeholder="ex: Youtube Premium" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none transition-all font-bold">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">URL Logo Produk</label>
+              <div class="flex items-center gap-2">
+                <input type="text" id="prod-image-url" oninput="updateLogoPreview()" placeholder="https://..." class="flex-1 min-w-0 bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none transition-all">
+                <div id="logoPreviewBox" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                  <span class="text-[9px] text-slate-600 font-bold">No img</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Deskripsi Singkat</label>
+              <input type="text" id="prod-desc" placeholder="Fitur/garansi produk..." class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none transition-all">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5 transition-all">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-white">📧 Butuh Email Customer?</span>
+                <span id="requiresEmailStatusText" class="text-[10px] font-bold text-slate-500">❌ Off</span>
+              </div>
+              <span class="text-[10px] text-slate-400 block mt-0.5">Tampilkan tombol 'Kirim Email' setelah pembayaran sukses (Tanpa Stok Pool TXT)</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+              <input type="checkbox" id="prod-requires-email" onchange="handleModalEmailToggle(this)" class="sr-only peer">
+              <div class="w-10 h-5.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-sky-500 shadow-inner"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Section 2: Varian Produk & Harga -->
+        <div class="bg-gradient-to-b from-slate-950/80 to-slate-950/40 border border-slate-800/90 rounded-2xl p-4 space-y-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-extrabold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
+              🎁 Varian Produk & Stok
+            </span>
+            <button type="button" onclick="addVariantRow()" class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500 border border-sky-500/30 text-sky-400 hover:text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1">
+              + Tambah Varian
+            </button>
+          </div>
+
+          <!-- Quick Preset Badges -->
+          <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span class="text-[10px] font-semibold text-slate-500">Quick add:</span>
+            <button type="button" onclick="addVariantRow('1 Bulan', 45000, 10)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ 1 Bulan</button>
+            <button type="button" onclick="addVariantRow('3 Bulan', 120000, 10)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ 3 Bulan</button>
+            <button type="button" onclick="addVariantRow('1 Tahun', 350000, 10)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ 1 Tahun</button>
+          </div>
+
+          <!-- Variant Input Rows -->
+          <div id="variantInputRows" class="space-y-2 max-h-40 overflow-y-auto no-scrollbar pt-1"></div>
+        </div>
+
+        <!-- Section 3: Harga Grosir / Bulk Tier -->
+        <div class="bg-gradient-to-b from-slate-950/80 to-slate-950/40 border border-slate-800/90 rounded-2xl p-4 space-y-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-extrabold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+              🏷️ Harga Grosir / Bulk Tier (Diskon Kuantitas)
+            </span>
+            <button type="button" onclick="addWholesaleRow()" class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 border border-amber-500/30 text-amber-400 hover:text-white rounded-xl text-xs font-extrabold transition-all">
+              + Tambah Tier Grosir
+            </button>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span class="text-[10px] font-semibold text-slate-500">Quick add:</span>
+            <button type="button" onclick="addWholesaleRow(5, 4000)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ Min 5 pcs</button>
+            <button type="button" onclick="addWholesaleRow(10, 3500)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ Min 10 pcs</button>
+            <button type="button" onclick="addWholesaleRow(50, 3000)" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">+ Min 50 pcs</button>
+          </div>
+
+          <!-- Wholesale Tier Rows -->
+          <div id="wholesaleInputRows" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar pt-1"></div>
+        </div>
+
+        <!-- Section 4: Integrated Stock Pool Section -->
+        <div id="stockPoolSection" class="hidden bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <span class="text-[11px] font-extrabold text-emerald-400 flex items-center gap-1.5">
+              ⚡ Kelola Stok Pool Akun
+            </span>
+            <span id="stockPoolBadge" class="px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0 pcs ready</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Target Varian</label>
+              <select id="prodStockVariantSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-sky-400 font-extrabold focus:outline-none transition-all">
+                <option value="Default">Varian: Default</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Tanggal Expired (Opsional)</label>
+              <input type="date" id="prodStockExpiry" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none transition-all font-semibold">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📁 Upload File .TXT</label>
+              <input type="file" id="prodStockFileInput" accept=".txt" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-sky-500/10 file:text-sky-400 hover:file:bg-sky-500 hover:file:text-white cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-1">
+            </div>
+            <div class="flex items-end">
+              <button type="button" onclick="clearProductStockWeb()" class="w-full py-2 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/30 text-rose-400 hover:text-white font-extrabold text-xs rounded-xl transition-all">
+                🗑️ Reset / Clear Stok
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📝 Paste Teks Akun (1 per baris)</label>
+            <textarea id="prodStockInputText" rows="3" placeholder="user1@gmail.com:pass123&#10;user2@gmail.com:pass456" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none transition-all"></textarea>
+          </div>
+
+          <button type="button" onclick="addStockFromModal()" class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5">
+            ⚡ Tambahkan Stok ke Pool
+          </button>
+
+          <!-- List of Existing Stock Items -->
+          <div class="pt-3 border-t border-slate-800/80 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-extrabold text-slate-300">📋 Daftar Akun di Stok Pool:</span>
+              <button type="button" onclick="cleanExpiredStockWeb()" class="text-[10px] text-amber-400 hover:underline font-bold">🧹 Clean Expired</button>
+            </div>
+            <div id="existingStockItemList" class="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[11px]">
+              <p class="text-[11px] text-slate-500 text-center py-2">Memuat daftar akun...</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="flex items-center justify-end gap-2.5 pt-3.5 border-t border-slate-800/80 shrink-0">
+        <button onclick="closeModal('modal-product')" class="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/60 text-slate-300 font-bold text-xs rounded-xl transition-all">Batal</button>
+        <button onclick="saveProduct()" class="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-sky-500/25 transition-all flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Simpan Produk
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal Bulk Stock Upload (Paste Text OR Upload File .TXT) -->
+  <div id="modal-stock" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 id="stockModalTitle" class="font-bold text-base text-white">Kelola Stok Pool</h3>
+        <span id="currentStockBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">0 pcs</span>
+      </div>
+
+      <input type="hidden" id="stockProdId">
+
+      <!-- Variant Selector -->
+      <select id="stockVariantSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-sky-400 font-bold focus:outline-none">
+        <option value="Default">Varian: Default</option>
+      </select>
+
+      <!-- Upload File .TXT Option -->
+      <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5">
+        <label class="text-[11px] font-bold text-sky-400 block">📁 Opsi 1: Upload File .TXT</label>
+        <input type="file" id="stockFileInput" accept=".txt" onchange="handleStockFileUpload(event)" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-white hover:file:bg-sky-400 cursor-pointer">
+      </div>
+
+      <!-- Paste Text Option -->
+      <div class="space-y-1">
+        <label class="text-[11px] font-bold text-slate-400 block">📝 Opsi 2: Paste Teks Akun (1 per baris)</label>
+        <textarea id="stockInputText" placeholder="user1@gmail.com:pass123&#10;user2@gmail.com:pass456" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none h-36 font-mono"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modal-stock')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Batal</button>
+        <button onclick="submitBulkStock()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          ⚡ Tambahkan Stok Pool
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Add Voucher -->
+  <div id="modal-voucher" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl p-5 space-y-3">
+      <h3 class="font-bold text-base text-white">Buat Voucher Baru</h3>
+      <input type="text" id="vouch-code" placeholder="Kode Voucher (ex: HEMAT50)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+      <select id="vouch-type" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <option value="fixed">Nominal (Rp)</option>
+        <option value="percentage">Persentase (%)</option>
+      </select>
+      <input type="number" id="vouch-value" placeholder="Nilai (ex: 5000 atau 10)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+      <input type="number" id="vouch-max" placeholder="Max Pengguna (0 = unlimited)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modal-voucher')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Batal</button>
+        <button onclick="saveVoucher()" class="px-4 py-2 bg-sky-500 text-white font-bold text-xs rounded-xl">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlUserId = urlParams.get('user_id');
+    const urlSecret = urlParams.get('secret');
+
+    const tg = window.Telegram?.WebApp;
+    const tgUser = tg?.initDataUnsafe?.user;
+
+    const currentUserId = tgUser?.id || urlUserId || '5665721422';
+    const currentSecret = urlSecret || 'panzzstore2026';
+
+    let activeTMail = null;
+    let allUsers = [];
+    let allProducts = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initDashboard();
+    });
+
+    function toggleSidebar() {
+      const sb = document.getElementById('sidebar');
+      const ov = document.getElementById('sidebarOverlay');
+      sb.classList.toggle('-translate-x-full');
+      ov.classList.toggle('hidden');
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.add('-translate-x-full');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+    }
+
+    function switchNav(element, name) {
+      document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.className = 'nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-400 hover:text-white hover:bg-slate-800';
+      });
+      
+      const targetView = document.getElementById(`view-${name}`);
+      if(targetView) targetView.classList.remove('hidden');
+      
+      if(element) {
+        element.className = 'nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all text-white bg-sky-500';
+      }
+
+      closeSidebar();
+
+      if(name === 'users') loadUsers();
+      if(name === 'products') loadProducts();
+      if(name === 'orders') loadOrders();
+      if(name === 'vouchers') loadVouchers();
+      if(name === 'settings') loadSettings();
+    }
+
+    async function apiFetch(endpoint, options = {}) {
+      options.headers = {
+        ...options.headers,
+        'Content-Type': 'application/json',
+        'x-telegram-user-id': currentUserId,
+        'x-admin-secret': currentSecret
+      };
+      const res = await fetch(endpoint, options);
+      return res.json();
+    }
+
+    async function initDashboard() {
+      try {
+        const data = await apiFetch('/api/admin/dashboard');
+        if(data.success && data.data) {
+          document.getElementById('stat-revenue').innerText = 'Rp ' + (data.data.dailyRevenue || 0).toLocaleString('id-ID');
+          document.getElementById('stat-orders').innerText = data.data.dailyOrders || 0;
+          document.getElementById('stat-users').innerText = data.data.totalUsers || 0;
+          document.getElementById('stat-products').innerText = data.data.totalProducts || 0;
+
+          renderDashboardExtras(data.data);
+        }
+      } catch (err) {
+        console.error('Init error:', err);
+      }
+      loadProducts();
+    }
+
+    function renderDashboardExtras(d) {
+      // 1. Low stock banner
+      const lowStockBanner = document.getElementById('dashboardLowStockBanner');
+      const lowStockText = document.getElementById('dashboardLowStockText');
+      if (d.lowStockProducts && d.lowStockProducts.length > 0) {
+        lowStockBanner.classList.remove('hidden');
+        const names = d.lowStockProducts.map(p => `${p.name} (${p.stock || 0} pcs)`).join(', ');
+        lowStockText.innerText = `Produk berikut butuh stok: ${names}`;
+      } else {
+        lowStockBanner.classList.add('hidden');
+      }
+
+      // 2. Sales 7 Days Chart
+      const chartContainer = document.getElementById('salesChartContainer');
+      const chartLabels = document.getElementById('salesChartLabels');
+      const chartTotal7Days = document.getElementById('chartTotal7Days');
+
+      if (d.sales7Days && d.sales7Days.length > 0) {
+        const total7 = d.sales7Days.reduce((s, day) => s + (day.revenue || 0), 0);
+        chartTotal7Days.innerText = 'Rp ' + total7.toLocaleString('id-ID');
+
+        const maxRev = Math.max(...d.sales7Days.map(day => day.revenue || 0), 1000);
+
+        chartContainer.innerHTML = d.sales7Days.map(day => {
+          const heightPct = Math.max(Math.round(((day.revenue || 0) / maxRev) * 100), 6);
+          return `
+            <div class="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
+              <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-950 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 whitespace-nowrap shadow-xl z-20 pointer-events-none">
+                Rp ${(day.revenue || 0).toLocaleString('id-ID')} (${day.count || 0} order)
+              </div>
+              <div style="height: ${heightPct}%" class="w-full bg-gradient-to-t from-sky-500/30 to-sky-400 rounded-t-lg group-hover:from-sky-400 group-hover:to-sky-300 transition-all duration-300 shadow-md"></div>
+            </div>
+          `;
+        }).join('');
+
+        chartLabels.innerHTML = d.sales7Days.map(day => `
+          <span class="flex-1 text-center truncate">${day.label}</span>
+        `).join('');
+      }
+
+      // 3. Top Products Leaderboard
+      const topList = document.getElementById('topProductsList');
+      if (d.topProducts && d.topProducts.length > 0) {
+        topList.innerHTML = d.topProducts.map((p, idx) => `
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg ${idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-400'} font-extrabold text-xs flex items-center justify-center">${idx + 1}</span>
+              <div>
+                <div class="font-bold text-xs text-white">${p.name}</div>
+                <div class="text-[10px] text-slate-400">${p.sold} unit terjual</div>
+              </div>
+            </div>
+            <span class="font-bold text-xs text-sky-400">Rp ${(p.revenue || 0).toLocaleString('id-ID')}</span>
+          </div>
+        `).join('');
+      } else {
+        topList.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Belum ada transaksi produk.</p>';
+      }
+
+      // 4. Recent Orders Table
+      const recentTbody = document.getElementById('table-recent-orders');
+      if (d.recentOrders && d.recentOrders.length > 0) {
+        recentTbody.innerHTML = d.recentOrders.map(o => {
+          const statusBadge = o.status === 'success' || o.status === 'paid' ?
+            '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ Sukses</span>' :
+            (o.status === 'pending' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">⏳ Pending</span>' :
+            '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">❌ Gagal</span>');
+
+          return `
+            <tr class="hover:bg-slate-800/40 transition-colors">
+              <td class="py-2.5 px-3 font-mono text-white text-[11px] font-bold">${o.id}</td>
+              <td class="py-2.5 px-3 font-semibold text-slate-300">${o.customerName || 'User'}</td>
+              <td class="py-2.5 px-3 text-slate-300 font-medium">${o.productName || '-'}</td>
+              <td class="py-2.5 px-3 font-bold text-sky-400">Rp ${(o.totalPrice || 0).toLocaleString('id-ID')}</td>
+              <td class="py-2.5 px-3 text-slate-400 uppercase font-semibold text-[10px]">${o.paymentMethod || '-'}</td>
+              <td class="py-2.5 px-3 text-right">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        recentTbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">Belum ada transaksi terbaru</td></tr>';
+      }
+    }
+
+    async function exportExcel() {
+      try {
+        const res = await apiFetch('/api/admin/reports/export');
+        if (res && res.success) {
+          alert('✅ ' + res.message);
+        } else {
+          alert('❌ Gagal mengirim laporan Excel: ' + (res?.error || 'Terjadi kesalahan server'));
+        }
+      } catch (err) {
+        alert('❌ Gagal mengirim laporan: ' + err.message);
+      }
+    }
+
+    // ─── PRODUCTS & STOCK POOL ───
+    async function loadProducts() {
+      const res = await apiFetch('/api/admin/products');
+      if(!res.success) return;
+      allProducts = res.data;
+      const tbody = document.getElementById('table-products');
+      tbody.innerHTML = res.data.map(p => `
+        <tr class="hover:bg-slate-800/40 transition-colors">
+          <td class="py-3 px-3">
+            <div class="flex items-center gap-2.5">
+              ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-8 h-8 rounded-lg object-cover border border-slate-800 shrink-0">` : '<div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">P</div>'}
+              <div class="font-bold text-white text-xs sm:text-sm truncate max-w-[150px] sm:max-w-xs">${p.name}</div>
+            </div>
+          </td>
+          <td class="py-3 px-3">
+            <span class="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-xl text-xs font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+              ${p.stock || 0} pcs
+            </span>
+          </td>
+          <td class="py-3 px-3">
+            <button onclick="toggleQuickEmailInvite('${String(p.id).replace(/'/g, "\\'")}', ${!p.requiresEmail})" title="Klik untuk ubah status Butuh Email" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${p.requiresEmail ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 shadow-sm shadow-emerald-500/10' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-800'}">
+              ${p.requiresEmail ? '📧 ON' : '❌ OFF'}
+            </button>
+          </td>
+          <td class="py-3 px-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button onclick="openEditProductModal('${String(p.id).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white rounded-lg text-xs font-semibold transition-all">✏️ Edit</button>
+              <button onclick="deleteProduct('${String(p.id).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg text-xs font-semibold transition-all">Hapus</button>
+            </div>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="py-6 text-center text-slate-500">Belum ada produk</td></tr>';
+    }
+
+    async function toggleQuickEmailInvite(productId, newState) {
+      await apiFetch(`/api/admin/products/${productId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ requiresEmail: newState })
+      });
+      const p = allProducts.find(item => String(item.id) === String(productId));
+      if (p) p.requiresEmail = newState;
+      loadProducts();
+    }
+
+    async function handleModalEmailToggle(checkbox) {
+      const editingId = document.getElementById('editingProductId').value;
+      const statusSpan = document.getElementById('requiresEmailStatusText');
+      const isChecked = checkbox.checked;
+
+      const poolSec = document.getElementById('stockPoolSection');
+      if (poolSec) {
+        if (isChecked) {
+          poolSec.classList.add('hidden');
+        } else if (editingId) {
+          poolSec.classList.remove('hidden');
+        }
+      }
+
+      if (statusSpan) {
+        statusSpan.innerText = '⚡ Saving...';
+        statusSpan.className = 'text-[10px] font-bold text-amber-400 animate-pulse';
+      }
+
+      if (editingId) {
+        await apiFetch(`/api/admin/products/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ requiresEmail: isChecked })
+        });
+        const p = allProducts.find(item => String(item.id) === String(editingId));
+        if (p) p.requiresEmail = isChecked;
+        loadProducts();
+      }
+
+      if (statusSpan) {
+        statusSpan.innerText = isChecked ? '✅ Aktif (Auto-saved)' : '❌ Off (Auto-saved)';
+        statusSpan.className = isChecked ? 'text-[10px] font-bold text-emerald-400' : 'text-[10px] font-bold text-slate-500';
+      }
+    }
+
+    function updateLogoPreview() {
+      const url = document.getElementById('prod-image-url').value.trim();
+      const box = document.getElementById('logoPreviewBox');
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        box.innerHTML = `<img src="${url}" onerror="this.parentElement.innerHTML='<span class=\'text-[10px] text-rose-500 font-bold\'>Error</span>'" class="w-full h-full object-cover">`;
+      } else {
+        box.innerHTML = `<span class="text-[10px] text-slate-600 font-bold">No img</span>`;
+      }
+    }
+
+    function addVariantRow(label = '', price = 0, stock = 10) {
+      const container = document.getElementById('variantInputRows');
+      const div = document.createElement('div');
+      div.className = 'flex items-center gap-2 variant-row bg-slate-900 border border-slate-800/90 p-2 rounded-xl';
+      div.innerHTML = `
+        <div class="flex-1 min-w-0">
+          <input type="text" placeholder="Nama Varian (ex: 1 Bulan)" value="${label}" class="v-label w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-sky-500 font-medium">
+        </div>
+        <div class="w-28 shrink-0 flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 focus-within:border-sky-500">
+          <span class="text-[11px] font-bold text-slate-500 mr-1">Rp</span>
+          <input type="number" placeholder="45000" value="${price || ''}" class="v-price w-full bg-transparent text-xs text-white focus:outline-none font-semibold">
+        </div>
+        <div class="w-28 shrink-0 flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 focus-within:border-emerald-500 shadow-inner" title="Stok Kuota Varian Ini">
+          <span class="text-[10px] font-extrabold text-emerald-500/90 mr-1 shrink-0">Stok:</span>
+          <input type="number" placeholder="10" value="${stock !== undefined && stock !== null ? stock : 10}" class="v-stock w-full bg-transparent text-xs text-emerald-400 focus:outline-none font-extrabold text-center">
+          <span class="text-[9px] font-bold text-slate-600 ml-0.5 shrink-0">pcs</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 font-bold text-xs flex items-center justify-center transition-all shrink-0">✕</button>
+      `;
+      container.appendChild(div);
+    }
+
+    function addWholesaleRow(minQty = 5, price = 0) {
+      const container = document.getElementById('wholesaleInputRows');
+      const div = document.createElement('div');
+      div.className = 'flex items-center gap-2 wholesale-row bg-slate-900 border border-slate-800/90 p-2 rounded-xl';
+      div.innerHTML = `
+        <div class="w-24 sm:w-28 shrink-0 flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 focus-within:border-amber-500">
+          <span class="text-[10px] font-extrabold text-slate-500 mr-1">Min</span>
+          <input type="number" placeholder="5" value="${minQty || ''}" class="w-full bg-transparent text-xs text-white focus:outline-none font-bold w-qty text-center">
+          <span class="text-[10px] font-semibold text-slate-500 ml-1">pcs</span>
+        </div>
+        <div class="flex-1 min-w-0 flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500">
+          <span class="text-[11px] font-bold text-amber-400 mr-1.5 shrink-0">Rp</span>
+          <input type="number" placeholder="4000" value="${price || ''}" class="w-full min-w-0 bg-transparent text-xs text-white focus:outline-none font-extrabold w-price">
+          <span class="text-[10px] font-semibold text-slate-400 ml-1 shrink-0">/pcs</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 font-bold text-xs flex items-center justify-center transition-all shrink-0">✕</button>
+      `;
+      container.appendChild(div);
+    }
+
+    function openAddProductModal() {
+      document.getElementById('editingProductId').value = '';
+      document.getElementById('productModalTitle').innerText = 'Tambah Produk Baru';
+      document.getElementById('stockPoolSection').classList.add('hidden');
+
+      document.getElementById('prod-name').value = '';
+      document.getElementById('prod-image-url').value = '';
+      document.getElementById('prod-desc').value = '';
+      document.getElementById('prod-requires-email').checked = false;
+      const statusSpan = document.getElementById('requiresEmailStatusText');
+      if (statusSpan) {
+        statusSpan.innerText = '❌ Off';
+        statusSpan.className = 'text-[10px] font-bold text-slate-500';
+      }
+      updateLogoPreview();
+
+      document.getElementById('variantInputRows').innerHTML = '';
+      document.getElementById('wholesaleInputRows').innerHTML = '';
+      addVariantRow('1 Bulan', 45000, 10);
+      document.getElementById('modal-product').classList.remove('hidden');
+    }
+
+    async function openEditProductModal(productId) {
+      let p = allProducts.find(item => item.id === productId || String(item.id) === String(productId));
+      if (!p) {
+        const res = await apiFetch('/api/admin/products');
+        if (res && res.success) {
+          allProducts = res.data;
+          p = allProducts.find(item => item.id === productId || String(item.id) === String(productId));
+        }
+      }
+      if (!p) return alert('Produk tidak ditemukan!');
+
+      document.getElementById('editingProductId').value = p.id;
+      document.getElementById('productModalTitle').innerText = `✏️ Edit Produk (${p.name})`;
+
+      document.getElementById('prod-name').value = p.name || '';
+      document.getElementById('prod-image-url').value = p.imageUrl || p.apkLogoUrl || '';
+      document.getElementById('prod-desc').value = p.description || '';
+      const isReq = Boolean(p.requiresEmail);
+      document.getElementById('prod-requires-email').checked = isReq;
+      const statusSpan = document.getElementById('requiresEmailStatusText');
+      if (statusSpan) {
+        statusSpan.innerText = isReq ? '✅ Aktif (Auto-saved)' : '❌ Off (Auto-saved)';
+        statusSpan.className = isReq ? 'text-[10px] font-bold text-emerald-400' : 'text-[10px] font-bold text-slate-500';
+      }
+
+      const poolSec = document.getElementById('stockPoolSection');
+      if (poolSec) {
+        if (isReq) {
+          poolSec.classList.add('hidden');
+        } else {
+          poolSec.classList.remove('hidden');
+        }
+      }
+
+      updateLogoPreview();
+
+      // Populate variants
+      const vContainer = document.getElementById('variantInputRows');
+      vContainer.innerHTML = '';
+      if (p.variants && p.variants.length > 0) {
+        p.variants.forEach(v => addVariantRow(v.label, v.price, v.stock !== undefined ? v.stock : 10));
+      } else {
+        addVariantRow('Default', p.basePrice || 0, p.stock || 10);
+      }
+
+      // Populate wholesale tiers
+      const wContainer = document.getElementById('wholesaleInputRows');
+      wContainer.innerHTML = '';
+      if (p.wholesaleTiers && p.wholesaleTiers.length > 0) {
+        p.wholesaleTiers.forEach(t => addWholesaleRow(t.minQty, t.price));
+      }
+
+      // Populate stock section in modal-product
+      if (document.getElementById('stockPoolBadge')) {
+        document.getElementById('stockPoolBadge').innerText = `${p.stock || 0} pcs ready`;
+      }
+      if (document.getElementById('prodStockInputText')) {
+        document.getElementById('prodStockInputText').value = '';
+      }
+      if (document.getElementById('prodStockFileInput')) {
+        document.getElementById('prodStockFileInput').value = '';
+      }
+
+      const pVarSelect = document.getElementById('prodStockVariantSelect');
+      if (pVarSelect) {
+        if (p.variants && p.variants.length > 0) {
+          pVarSelect.innerHTML = p.variants.map(v => `<option value="${v.label}">Varian: ${v.label}</option>`).join('');
+        } else {
+          pVarSelect.innerHTML = `<option value="Default">Varian: Default</option>`;
+        }
+      }
+
+      document.getElementById('modal-product').classList.remove('hidden');
+      loadExistingStockItems(p.id);
+    }
+
+    async function saveProduct() {
+      const editingId = document.getElementById('editingProductId').value;
+      const name = document.getElementById('prod-name').value.trim();
+      const imageUrl = document.getElementById('prod-image-url').value.trim();
+      const description = document.getElementById('prod-desc').value.trim();
+      const requiresEmail = document.getElementById('prod-requires-email').checked;
+
+      if (!name) return alert('Nama produk tidak boleh kosong!');
+
+      const variantRows = document.querySelectorAll('.variant-row');
+      const variants = [];
+      variantRows.forEach(row => {
+        const label = row.querySelector('.v-label').value.trim();
+        const price = parseInt(row.querySelector('.v-price').value) || 0;
+        const rawStock = row.querySelector('.v-stock').value;
+        const stock = rawStock !== '' ? parseInt(rawStock) : 10;
+        if (label) {
+          variants.push({ label, price, stock });
+        }
+      });
+
+      if (variants.length === 0) {
+        variants.push({ label: 'Default', price: 0, stock: 0 });
+      }
+
+      const basePrice = variants[0]?.price || 0;
+
+      const wholesaleRows = document.querySelectorAll('.wholesale-row');
+      const wholesaleTiers = [];
+      wholesaleRows.forEach(row => {
+        const minQty = parseInt(row.querySelector('.w-qty').value) || 0;
+        const price = parseInt(row.querySelector('.w-price').value) || 0;
+        if (minQty > 0 && price > 0) {
+          wholesaleTiers.push({ minQty, price });
+        }
+      });
+
+      const endpoint = editingId ? `/api/admin/products/${editingId}` : '/api/admin/products';
+      const method = editingId ? 'PUT' : 'POST';
+
+      const res = await apiFetch(endpoint, {
+        method,
+        body: JSON.stringify({ name, basePrice, imageUrl, apkLogoUrl: imageUrl, description, requiresEmail, deliveryType: 'instant', variants, wholesaleTiers })
+      });
+
+      if (res && res.success) {
+        closeModal('modal-product');
+        loadProducts();
+      } else {
+        alert('Gagal menyimpan produk: ' + (res?.error || 'Terjadi kesalahan server'));
+      }
+    }
+
+    async function openStockModal(productId, productName, currentStock) {
+      document.getElementById('stockProdId').value = productId;
+      document.getElementById('stockModalTitle').innerText = `Kelola Stok (${productName})`;
+      document.getElementById('currentStockBadge').innerText = `${currentStock || 0} pcs ready`;
+      document.getElementById('stockInputText').value = '';
+      document.getElementById('stockFileInput').value = '';
+
+      let prod = allProducts.find(p => p.id === productId || String(p.id) === String(productId));
+      if (!prod) {
+        const res = await apiFetch('/api/admin/products');
+        if (res && res.success) {
+          allProducts = res.data;
+          prod = allProducts.find(p => p.id === productId || String(p.id) === String(productId));
+        }
+      }
+      const varSelect = document.getElementById('stockVariantSelect');
+      if (varSelect) {
+        if (prod && prod.variants && prod.variants.length > 0) {
+          varSelect.innerHTML = prod.variants.map(v => `<option value="${v.label}">Pilih Varian: ${v.label}</option>`).join('');
+        } else {
+          varSelect.innerHTML = `<option value="Default">Varian: Default</option>`;
+        }
+      }
+
+      document.getElementById('modal-stock').classList.remove('hidden');
+    }
+
+    function handleProdStockFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('prodStockInputText').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    function handleStockFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('stockInputText').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    async function submitBulkStock(isFromProdModal = false) {
+      try {
+        const productId = isFromProdModal
+          ? document.getElementById('editingProductId').value
+          : document.getElementById('stockProdId').value;
+        const itemsText = isFromProdModal
+          ? document.getElementById('prodStockInputText').value
+          : document.getElementById('stockInputText').value;
+        const variantLabel = isFromProdModal
+          ? document.getElementById('prodStockVariantSelect')?.value || 'Default'
+          : document.getElementById('stockVariantSelect')?.value || 'Default';
+        const expiredAt = isFromProdModal
+          ? document.getElementById('prodStockExpInput')?.value
+          : null;
+
+        if (!productId) return alert('Produk belum dipilih!');
+        if (!itemsText || !itemsText.trim()) return alert('Teks stok akun tidak boleh kosong!');
+
+        const res = await apiFetch(`/api/admin/stock/${productId}`, {
+          method: 'POST',
+          body: JSON.stringify({ itemsText, variantLabel, expiredAt })
+        });
+
+        if (res && res.success) {
+          alert(`Berhasil menambahkan ${res.addedCount} stok akun baru! Total stok: ${res.currentStock} pcs`);
+          if (isFromProdModal) {
+            document.getElementById('prodStockInputText').value = '';
+            document.getElementById('prodStockFileInput').value = '';
+            document.getElementById('stockPoolBadge').innerText = `${res.currentStock} pcs ready`;
+            loadExistingStockItems(productId);
+          } else {
+            closeModal('modal-stock');
+          }
+          loadProducts();
+        } else {
+          alert('Gagal tambah stok: ' + (res?.error || 'Terjadi kesalahan pada server'));
+        }
+      } catch (err) {
+        alert('Gagal mengirim data stok: ' + err.message);
+      }
+    }
+
+    async function loadExistingStockItems(productId) {
+      const container = document.getElementById('existingStockItemList');
+      if (!container) return;
+      container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-2">Memuat daftar akun...</p>';
+
+      try {
+        const res = await apiFetch(`/api/admin/stock/${productId}`);
+        if (res && res.success && res.data) {
+          if (res.data.length === 0) {
+            container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-2">Belum ada akun di stok pool.</p>';
+            return;
+          }
+
+          const now = new Date();
+          container.innerHTML = res.data.map((item, idx) => {
+            const text = item.data || item.text || '-';
+            let expBadge = '';
+            if (item.expiredAt) {
+              const expDate = new Date(item.expiredAt);
+              const isExp = expDate <= now;
+              expBadge = `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${isExp ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">${isExp ? 'EXPIRED' : 'Exp: ' + expDate.toLocaleDateString('id-ID')}</span>`;
+            }
+
+            return `
+              <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 gap-2">
+                <div class="truncate flex-1 min-w-0">
+                  <span class="text-slate-500 font-bold mr-1">#${idx+1}</span>
+                  <span class="text-slate-200 font-semibold truncate">${escapeHTML(text)}</span>
+                  ${expBadge}
+                </div>
+                <button type="button" onclick="deleteStockItemWeb('${item.id}', '${productId}')" class="px-2 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg text-[10px] font-bold transition-all shrink-0">🗑 Hapus</button>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        container.innerHTML = '<p class="text-[11px] text-rose-400 text-center py-2">Gagal memuat stok akun</p>';
+      }
+    }
+
+    async function deleteStockItemWeb(itemId, productId) {
+      if (!confirm('Hapus item akun stok ini?')) return;
+      try {
+        const res = await apiFetch(`/api/stock/item/${itemId}`, { method: 'DELETE' });
+        if (res && res.success) {
+          loadExistingStockItems(productId);
+          loadProducts();
+        } else {
+          alert('Gagal menghapus stok: ' + (res?.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function clearProductStockWeb() {
+      const pId = document.getElementById('editingProductId').value;
+      if (!pId) return;
+      if (!confirm('Hapus SEMUA stok yang belum terpakai untuk produk ini?')) return;
+      try {
+        const res = await apiFetch(`/api/stock/clear/${pId}`, { method: 'DELETE' });
+        if (res && res.success) {
+          alert(`✅ ${res.deletedCount || 0} stok berhasil dibersihkan.`);
+          loadExistingStockItems(pId);
+          loadProducts();
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function cleanExpiredStockWeb() {
+      const pId = document.getElementById('editingProductId').value;
+      try {
+        const res = await apiFetch(`/api/stock/clean-expired`, {
+          method: 'POST',
+          body: JSON.stringify({ productId: pId || null })
+        });
+        if (res && res.success) {
+          alert(`🧹 ${res.cleanedCount || 0} stok kadaluarsa telah dibersihkan.`);
+          if (pId) loadExistingStockItems(pId);
+          loadProducts();
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function deleteProduct(id) {
+      if(!confirm('Hapus produk ini?')) return;
+      await apiFetch(`/api/admin/products/${id}`, { method: 'DELETE' });
+      loadProducts();
+    }
+
+    // ─── USERS ───
+    async function loadUsers() {
+      const res = await apiFetch('/api/admin/users');
+      if(!res.success) return;
+      allUsers = res.data;
+      renderUsers(allUsers);
+    }
+
+    function renderUsers(users) {
+      const tbody = document.getElementById('table-users');
+      if(users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">Belum ada user registered</td></tr>';
+        return;
+      }
+      tbody.innerHTML = users.map(u => `
+        <tr class="hover:bg-slate-800/40 transition-colors">
+          <td class="py-3 px-3"><code class="text-sky-400 font-mono text-[11px]">${u.id}</code></td>
+          <td class="py-3 px-3 font-semibold text-white">${u.firstName || u.name || 'Member'} ${u.username ? '<span class="text-slate-400 text-[11px]">(@' + u.username + ')</span>' : ''}</td>
+          <td class="py-3 px-3 font-bold text-emerald-400">Rp ${(u.balance || 0).toLocaleString('id-ID')}</td>
+          <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${u.role === 'admin' ? 'bg-sky-500/20 text-sky-400' : 'bg-slate-800 text-slate-300'}">${u.role || 'user'}</span></td>
+          <td class="py-3 px-3">${u.isBlocked ? '🔴 Blocked' : '🟢 Active'}</td>
+          <td class="py-3 px-3 text-right flex justify-end gap-1.5">
+            <button onclick="editSaldo('${u.id}', ${u.balance || 0})" class="px-2 py-1 bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white rounded-lg text-xs font-semibold">💰 Saldo</button>
+            <button onclick="toggleBlockUser('${u.id}')" class="px-2 py-1 ${u.isBlocked ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'} rounded-lg text-xs font-semibold">${u.isBlocked ? 'Unblock' : 'Block'}</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterUsers() {
+      const q = document.getElementById('searchUser').value.toLowerCase();
+      const filtered = allUsers.filter(u => u.id.toString().includes(q) || (u.firstName || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q));
+      renderUsers(filtered);
+    }
+
+    async function editSaldo(userId, currentSaldo) {
+      const val = prompt(`Masukkan jumlah saldo baru untuk User ID: ${userId}\n(Current: Rp ${currentSaldo.toLocaleString('id-ID')})`, currentSaldo);
+      if(val === null) return;
+      const amount = parseInt(val);
+      if(isNaN(amount)) return alert('Nominal harus angka!');
+
+      await apiFetch(`/api/admin/users/${userId}/saldo`, {
+        method: 'POST',
+        body: JSON.stringify({ amount, action: 'set' })
+      });
+      loadUsers();
+    }
+
+    async function toggleBlockUser(userId) {
+      if(!confirm(`Ubah status block/unblock User ID: ${userId}?`)) return;
+      await apiFetch(`/api/admin/users/${userId}/block`, { method: 'POST' });
+      loadUsers();
+    }
+
+    // ─── ORDERS ───
+    async function loadOrders() {
+      const res = await apiFetch('/api/admin/orders');
+      if(!res.success) return;
+      const tbody = document.getElementById('table-orders');
+      tbody.innerHTML = res.data.map(o => `
+        <tr class="hover:bg-slate-800/40 transition-colors">
+          <td class="py-3 px-3"><code class="text-sky-400 font-mono text-[11px]">${o.id}</code></td>
+          <td class="py-3 px-3 font-medium text-white">${o.customerName || '-'}</td>
+          <td class="py-3 px-3">${o.productName || '-'}</td>
+          <td class="py-3 px-3 font-semibold text-white">Rp ${(o.totalPrice || 0).toLocaleString('id-ID')}</td>
+          <td class="py-3 px-3 uppercase text-[11px] text-slate-400">${o.paymentMethod}</td>
+          <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${['success','paid'].includes(o.status) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${o.status}</span></td>
+          <td class="py-3 px-3 text-right">
+            ${o.status === 'pending' || o.status === 'processing' ? `
+              <button onclick="approveOrder('${o.id}')" class="px-2 py-1 bg-sky-500 text-white rounded-lg text-xs font-semibold mr-1">Approve</button>
+              <button onclick="rejectOrder('${o.id}')" class="px-2 py-1 bg-rose-500/10 text-rose-400 rounded-lg text-xs font-semibold">Reject</button>
+            ` : '-'}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="py-6 text-center text-slate-500">Belum ada order</td></tr>';
+    }
+
+    async function approveOrder(id) {
+      await apiFetch(`/api/admin/orders/${id}/approve`, { method: 'POST' });
+      loadOrders();
+    }
+
+    async function rejectOrder(id) {
+      await apiFetch(`/api/admin/orders/${id}/reject`, { method: 'POST' });
+      loadOrders();
+    }
+
+    // ─── VOUCHERS ───
+    async function loadVouchers() {
+      const res = await apiFetch('/api/admin/vouchers');
+      if(!res.success) return;
+      const tbody = document.getElementById('table-vouchers');
+      tbody.innerHTML = res.data.map(v => `
+        <tr class="hover:bg-slate-800/40 transition-colors">
+          <td class="py-3 px-3"><code class="text-sky-400 font-mono text-[11px]">${v.code}</code></td>
+          <td class="py-3 px-3 uppercase text-[11px]">${v.type}</td>
+          <td class="py-3 px-3 font-semibold text-white">${v.type === 'percentage' ? v.value + '%' : 'Rp ' + v.value.toLocaleString('id-ID')}</td>
+          <td class="py-3 px-3">${v.currentUses || 0} / ${v.maxUses || '∞'}</td>
+          <td class="py-3 px-3 text-right">
+            <button onclick="deleteVoucher('${v.id}')" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg text-xs font-semibold transition-all">Hapus</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="py-6 text-center text-slate-500">Belum ada voucher</td></tr>';
+    }
+
+    function openAddVoucherModal() {
+      document.getElementById('modal-voucher').classList.remove('hidden');
+    }
+
+    async function saveVoucher() {
+      const code = document.getElementById('vouch-code').value;
+      const type = document.getElementById('vouch-type').value;
+      const value = parseInt(document.getElementById('vouch-value').value);
+      const maxUses = parseInt(document.getElementById('vouch-max').value);
+
+      await apiFetch('/api/admin/vouchers', {
+        method: 'POST',
+        body: JSON.stringify({ code, type, value, maxUses })
+      });
+      closeModal('modal-voucher');
+      loadVouchers();
+    }
+
+    async function deleteVoucher(id) {
+      if(!confirm('Hapus voucher ini?')) return;
+      await apiFetch(`/api/admin/vouchers/${id}`, { method: 'DELETE' });
+      loadVouchers();
+    }
+
+    // ─── TMAIL ───
+    async function generateTMail() {
+      const res = await apiFetch('/api/admin/tmail/generate');
+      if(!res.success) return;
+      activeTMail = res.data;
+      document.getElementById('tmail-active-address').innerText = activeTMail.email;
+      checkTMailInbox();
+    }
+
+    async function checkTMailInbox() {
+      if(!activeTMail) return alert('Generate email terlebih dahulu!');
+      const res = await apiFetch(`/api/admin/tmail/inbox?login=${activeTMail.login}&domain=${activeTMail.domain}`);
+      if(!res.success) return;
+
+      const container = document.getElementById('tmail-inbox-list');
+      if(res.data.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500">Belum ada pesan masuk.</p>';
+        return;
+      }
+
+      container.innerHTML = res.data.map(m => `
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
+          <div class="text-xs font-bold text-sky-400">From: ${m.from}</div>
+          <div class="text-xs font-semibold text-white">Subject: ${m.subject || '(no subject)'}</div>
+          <div class="text-[10px] text-slate-500">${m.date}</div>
+        </div>
+      `).join('');
+    }
+
+    // ─── SETTINGS & MAINTENANCE ───
+    async function loadSettings() {
+      const [settingsRes, mainRes] = await Promise.all([
+        apiFetch('/api/admin/settings'),
+        apiFetch('/api/admin/maintenance')
+      ]);
+
+      if(settingsRes.success && settingsRes.data) {
+        document.getElementById('setting-store-name').value = settingsRes.data.storeName || '';
+        document.getElementById('setting-logo-url').value = settingsRes.data.storeLogoUrl || '';
+        document.getElementById('setting-wa-cs').value = settingsRes.data.contactWhatsapp || '';
+        document.getElementById('setting-tele-cs').value = settingsRes.data.contactTelegram || '';
+        document.getElementById('setting-group-tele').value = settingsRes.data.groupTelegram || '';
+        document.getElementById('mustJoinToggle').checked = settingsRes.data.mustJoinEnabled !== false;
+        document.getElementById('setting-req-channel-id').value = settingsRes.data.requiredChannelId || '';
+        document.getElementById('setting-req-channel-link').value = settingsRes.data.requiredChannelLink || '';
+      }
+
+      if(mainRes.success && mainRes.data) {
+        document.getElementById('maintenanceToggle').checked = Boolean(mainRes.data.isMaintenance);
+        document.getElementById('maintenanceMsg').value = mainRes.data.message || '';
+      }
+    }
+
+    async function toggleMaintenanceMode() {
+      const isMaintenance = document.getElementById('maintenanceToggle').checked;
+      const message = document.getElementById('maintenanceMsg').value || 'Bot sedang dalam pemeliharaan berkala.';
+
+      await apiFetch('/api/admin/maintenance', {
+        method: 'POST',
+        body: JSON.stringify({ isMaintenance, message })
+      });
+      alert(`Status Maintenance Mode diubah menjadi: ${isMaintenance ? '🔴 TUTUP TOKO (ON)' : '🟢 BUKA TOKO (OFF)'}`);
+    }
+
+    async function saveSettings() {
+      const storeName = document.getElementById('setting-store-name').value;
+      const storeLogoUrl = document.getElementById('setting-logo-url').value;
+      const contactWhatsapp = document.getElementById('setting-wa-cs').value;
+      const contactTelegram = document.getElementById('setting-tele-cs').value;
+      const groupTelegram = document.getElementById('setting-group-tele').value;
+      const mustJoinEnabled = document.getElementById('mustJoinToggle').checked;
+      const requiredChannelId = document.getElementById('setting-req-channel-id').value;
+      const requiredChannelLink = document.getElementById('setting-req-channel-link').value;
+
+      await apiFetch('/api/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify({ storeName, storeLogoUrl, contactWhatsapp, contactTelegram, groupTelegram, mustJoinEnabled, requiredChannelId, requiredChannelLink })
+      });
+      alert('Pengaturan toko, CS & Wajib Join Channel berhasil disimpan!');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
