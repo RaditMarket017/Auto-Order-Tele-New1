@@ -44,11 +44,15 @@
     userPhotoUrl = photo_url || '';
     tgRef = tg;
 
+    const loadingTimeout = setTimeout(() => {
+      loading = false;
+    }, 4000);
+
     try {
       const [infoRes, prodRes, userRes] = await Promise.all([
-        fetchStoreInfo(),
-        fetchProducts(),
-        id ? fetchUserProfile(id) : Promise.resolve(null),
+        fetchStoreInfo().catch(() => null),
+        fetchProducts().catch(() => null),
+        id ? fetchUserProfile(id).catch(() => null) : Promise.resolve(null),
       ]);
 
       // User profile
@@ -84,14 +88,16 @@
       }
 
       // Products
-      if (prodRes?.success && prodRes.data?.length > 0) {
+      if (prodRes?.success && Array.isArray(prodRes.data)) {
         allProducts = prodRes.data;
         filteredProducts = prodRes.data;
       }
     } catch (err) {
       console.error('Init error:', err);
+    } finally {
+      clearTimeout(loadingTimeout);
+      loading = false;
     }
-    loading = false;
   });
 
   function handleFilter(category) {

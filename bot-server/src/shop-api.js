@@ -77,19 +77,26 @@ router.get('/store-info', async (req, res) => {
 // ─── GET /api/shop/products ───
 router.get('/products', async (req, res) => {
   try {
-    const snap = await db.collection('products').orderBy('order', 'asc').get();
-    const poolSnap = await db.collection('credentials_pool').where('isUsed', '==', false).get();
+    let snap;
+    try {
+      snap = await db.collection('products').orderBy('order', 'asc').get();
+    } catch {
+      snap = await db.collection('products').get();
+    }
 
     const stockMap = {};
-    poolSnap.forEach(d => {
-      const data = d.data();
-      const pId = data.productId;
-      const vLabel = data.variantLabel || 'Default';
-      if (!stockMap[pId]) stockMap[pId] = {};
-      stockMap[pId][vLabel] = (stockMap[pId][vLabel] || 0) + 1;
-    });
+    try {
+      const poolSnap = await db.collection('credentials_pool').where('isUsed', '==', false).get();
+      poolSnap.forEach(d => {
+        const data = d.data();
+        const pId = data.productId;
+        const vLabel = data.variantLabel || 'Default';
+        if (!stockMap[pId]) stockMap[pId] = {};
+        stockMap[pId][vLabel] = (stockMap[pId][vLabel] || 0) + 1;
+      });
+    } catch {}
 
-    const products = snap.docs
+    const products = (snap.docs || [])
       .map(d => {
         const pData = d.data();
         const pId = d.id;
@@ -115,7 +122,7 @@ router.get('/products', async (req, res) => {
 
     res.json({ success: true, data: products });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, data: [] });
   }
 });
 
