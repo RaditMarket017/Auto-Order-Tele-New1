@@ -3,7 +3,9 @@ const config = require('./config');
 
 let rawBaseUrl = process.env.PANZZPAY_BASE_URL || config.PANZZPAY_BASE_URL || 'https://panzzpay.my.id/api/public';
 rawBaseUrl = rawBaseUrl.replace(/\/$/, '');
-if (!rawBaseUrl.endsWith('/api/public') && !rawBaseUrl.endsWith('/api')) {
+if (rawBaseUrl.endsWith('/docs')) {
+  rawBaseUrl = rawBaseUrl.replace(/\/docs$/, '/api/public');
+} else if (!rawBaseUrl.endsWith('/api/public') && !rawBaseUrl.endsWith('/api')) {
   rawBaseUrl += '/api/public';
 }
 const BASE_URL = rawBaseUrl;
