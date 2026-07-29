@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js",
+    "postinstall": "npm --prefix bot-server/shop-app install --no-audit && npm --prefix bot-server/admin-app install --no-audit",
     "build:shop": "npm --prefix bot-server/shop-app run build",
     "build:admin": "npm --prefix bot-server/admin-app run build",
-    "build": "npm run build:shop && npm run build:admin"
+    "build": "npm run postinstall && npm run build:shop && npm run build:admin"
   },
   "dependencies": {
     "telegraf": "^4.16.3",
