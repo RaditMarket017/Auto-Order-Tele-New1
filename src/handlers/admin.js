@@ -215,7 +215,9 @@ async function listProducts(ctx) {
 
   snap.docs.forEach((doc, i) => {
     const p = doc.data();
-    const stock = stockMap[doc.id] ?? (p.variants || []).reduce((s, v) => s + (v.stock || 0), 0) ?? p.stock ?? 0;
+    const stock = Boolean(p.requiresEmail)
+      ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
+      : (stockMap[doc.id] || 0);
     msg += `<b>${i + 1}. ${escapeHTML(p.name).toUpperCase()}</b> - (<b>${stock}</b> stok)\n`;
     buttons.push([
       Markup.button.callback(`✏ ${p.name}`, `admin_edit_${doc.id}`),

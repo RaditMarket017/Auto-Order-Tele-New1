@@ -189,7 +189,7 @@ router.get('/products', async (req, res) => {
         if (reqEmail) {
           vStock = (v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0;
         } else {
-          vStock = stockMap[pId]?.[v.label] ?? v.stock ?? 0;
+          vStock = stockMap[pId]?.[v.label] || 0;
         }
         return { ...v, stock: vStock };
       });

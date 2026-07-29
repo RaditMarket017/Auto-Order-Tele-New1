@@ -34,7 +34,9 @@ async function showOrderSummary(ctx, productId, variantIndex) {
       .where('isUsed', '==', false)
       .get();
 
-    const availableStock = poolSnap.size || variant.stock || (product.stock > 0 ? product.stock : 0);
+    const availableStock = Boolean(product.requiresEmail)
+      ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
+      : poolSnap.size;
     if (availableStock <= 0) {
       return ctx.answerCbQuery(t(lang, 'product_out_of_stock'), { show_alert: true }).catch(() => {});
     }

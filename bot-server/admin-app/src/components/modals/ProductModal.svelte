@@ -289,7 +289,9 @@
         {#if activeModalTab === 'variants'}
           <div class="bg-gradient-to-b from-slate-950/80 to-slate-950/40 border border-slate-800/90 rounded-2xl p-4 space-y-3 shadow-sm">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-extrabold text-sky-400 uppercase tracking-wider">🎁 Varian Produk & Stok</span>
+              <span class="text-[11px] font-extrabold text-sky-400 uppercase tracking-wider">
+                {requiresEmail ? '🎁 Varian Produk & Stok' : '🎁 Varian Produk & Harga'}
+              </span>
               <button type="button" onclick={() => addVariant()} class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500 border border-sky-500/30 text-sky-400 hover:text-white rounded-xl text-xs font-extrabold cursor-pointer">+ Tambah Varian</button>
             </div>
 
@@ -313,11 +315,18 @@
                       <span class="text-[11px] font-extrabold text-slate-500 mr-1.5">Rp</span>
                       <input type="number" placeholder="45000" bind:value={v.price} class="w-full min-w-0 bg-transparent text-xs text-white focus:outline-none font-extrabold" />
                     </div>
-                    <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-emerald-500">
-                      <span class="text-[10px] font-extrabold text-emerald-400 mr-1 shrink-0">Stok:</span>
-                      <input type="number" placeholder="10" bind:value={v.stock} class="w-full min-w-0 bg-transparent text-xs text-emerald-400 focus:outline-none font-extrabold text-center" />
-                      <span class="text-[9px] text-slate-500 font-bold ml-1 shrink-0">pcs</span>
-                    </div>
+                    {#if requiresEmail}
+                      <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-emerald-500">
+                        <span class="text-[10px] font-extrabold text-emerald-400 mr-1 shrink-0">Stok:</span>
+                        <input type="number" placeholder="10" bind:value={v.stock} class="w-full min-w-0 bg-transparent text-xs text-emerald-400 focus:outline-none font-extrabold text-center" />
+                        <span class="text-[9px] text-slate-500 font-bold ml-1 shrink-0">pcs</span>
+                      </div>
+                    {:else}
+                      <div class="flex items-center justify-between bg-slate-950/80 border border-slate-800/80 rounded-lg px-2.5 py-1.5" title="Stok produk instan otomatis dibaca dari Stok Pool">
+                        <span class="text-[10px] font-extrabold text-emerald-400 flex items-center gap-1">⚡ Stok Pool:</span>
+                        <span class="text-xs font-extrabold text-emerald-400">{v.stock || 0} pcs</span>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}

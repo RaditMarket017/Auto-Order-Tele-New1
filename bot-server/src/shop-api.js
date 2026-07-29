@@ -106,7 +106,7 @@ router.get('/products', async (req, res) => {
           if (reqEmail) {
             vStock = (v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0;
           } else {
-            vStock = stockMap[pId]?.[v.label] ?? v.stock ?? 0;
+            vStock = stockMap[pId]?.[v.label] || 0;
           }
           return { ...v, stock: vStock };
         });
@@ -195,7 +195,9 @@ router.post('/create-order', async (req, res) => {
       .where('isUsed', '==', false)
       .get();
 
-    const availableStock = poolSnap.size || variant.stock || (product.stock > 0 ? product.stock : 0);
+    const availableStock = Boolean(product.requiresEmail)
+      ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
+      : poolSnap.size;
     if (availableStock < quantity) {
       return res.status(400).json({ success: false, error: 'Out of stock' });
     }

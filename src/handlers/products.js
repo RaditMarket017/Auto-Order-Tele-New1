@@ -63,8 +63,10 @@ async function showProductList(ctx, page = 0, isEdit = false) {
     });
 
     for (let i = 0; i < pageProducts.length; i++) {
-      const p = pageProducts[i];
-      const totalStock = stockMap[p.id] ?? (p.variants || []).reduce((s, v) => s + (v.stock || 0), 0) ?? p.stock ?? 0;
+      const isReqEmail = Boolean(p.requiresEmail);
+      const totalStock = isReqEmail
+        ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
+        : (stockMap[p.id] || 0);
       msg += t(lang, 'product_list_item', {
         num: startNum + i,
         name: escapeHTML(p.name).toUpperCase(),
@@ -155,10 +157,14 @@ async function showProductDetail(ctx, productId) {
       description: escapeHTML(product.description || 'Tidak ada deskripsi.'),
     });
 
+    const isReqEmail = Boolean(product.requiresEmail);
+
     // Add variant list with price and stock per variant
     for (const v of variants) {
       const price = await getProductPrice(v, userId);
-      const vStock = stockByVariant[v.label] ?? v.stock ?? 0;
+      const vStock = isReqEmail
+        ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
+        : (stockByVariant[v.label] || 0);
       const stockBadge = vStock > 0 ? `🟢 <b>${vStock}</b>` : `🔴 <b>0 (Habis)</b>`;
       msg += '\n' + t(lang, 'product_variant_item', {
         label: escapeHTML(v.label),
@@ -181,7 +187,9 @@ async function showProductDetail(ctx, productId) {
     const buttons = [];
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
-      const stock = stockByVariant[v.label] ?? v.stock ?? (product.stock > 0 ? product.stock : 0);
+      const stock = isReqEmail
+        ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
+        : (stockByVariant[v.label] || 0);
       const label = stock > 0 ? `🛒 ${v.label}` : `❌ ${v.label} (Habis)`;
       buttons.push([Markup.button.callback(label, stock > 0 ? `buy_${productId}_${i}` : `noop`)]);
     }
