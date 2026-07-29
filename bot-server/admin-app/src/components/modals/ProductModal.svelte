@@ -8,7 +8,7 @@
   let imageUrl = $state('');
   let description = $state('');
   let requiresEmail = $state(false);
-  let variants = $state([{ label: '1 Bulan', price: 45000, stock: 10, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' }]);
+  let variants = $state([{ label: '1 Bulan', description: '', price: 45000, stock: 10, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' }]);
   let wholesaleTiers = $state([]);
 
   let activeModalTab = $state('info');
@@ -17,6 +17,7 @@
   let selectedVariantForStock = $state('Default');
   let stockInputText = $state('');
   let stockExpiry = $state('');
+  let stockInviteToggle = $state(false);
 
   let saveStatusText = $state('');
 
@@ -27,7 +28,7 @@
       imageUrl = editingProduct.imageUrl || editingProduct.apkLogoUrl || '';
       description = editingProduct.description || '';
       requiresEmail = Boolean(editingProduct.requiresEmail);
-      variants = editingProduct.variants?.length ? JSON.parse(JSON.stringify(editingProduct.variants)) : [{ label: '1 Bulan', price: 45000, stock: 10, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' }];
+      variants = editingProduct.variants?.length ? JSON.parse(JSON.stringify(editingProduct.variants)) : [{ label: '1 Bulan', description: '', price: 45000, stock: 10, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' }];
       wholesaleTiers = editingProduct.wholesaleTiers?.length ? JSON.parse(JSON.stringify(editingProduct.wholesaleTiers)) : [];
       saveStatusText = requiresEmail ? '✅ Aktif' : '❌ Off';
       loadStockItems();
@@ -36,7 +37,7 @@
       imageUrl = '';
       description = '';
       requiresEmail = false;
-      variants = [{ label: '1 Bulan', price: 45000, stock: 10, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' }];
+      variants = [{ label: '1 Bulan', description: '', price: 45000, stock: 10, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' }];
       wholesaleTiers = [];
       saveStatusText = '❌ Off';
       stockItems = [];
@@ -55,8 +56,8 @@
     }
   }
 
-  function addVariant(label = '', price = 0, stock = 10, warrantyDays = 0, renewEnabled = false, maxRenew = 1, renewDelayDays = 0, notes = '') {
-    variants = [...variants, { label, price, stock, warrantyDays, renewEnabled, maxRenew, renewDelayDays, notes }];
+  function addVariant(label = '', price = 0, stock = 10, description = '', warrantyDays = 0, warrantyEndDate = '', renewEnabled = false, renewStartDate = '', maxRenew = 1, renewDelayDays = 0, renewNotReadyMessage = '', inviteEnabled = false, notes = '') {
+    variants = [...variants, { label, description, price, stock, warrantyDays, warrantyEndDate, renewEnabled, renewStartDate, maxRenew, renewDelayDays, renewNotReadyMessage, inviteEnabled, notes }];
   }
 
   function removeVariant(idx) {
@@ -121,7 +122,12 @@
 
     const res = await apiFetch(`/api/admin/stock/${editingProduct.id}`, {
       method: 'POST',
-      body: JSON.stringify({ itemsText: stockInputText, variantLabel: selectedVariantForStock, expiredAt: stockExpiry })
+      body: JSON.stringify({
+        itemsText: stockInputText,
+        variantLabel: selectedVariantForStock,
+        expiredAt: stockExpiry,
+        inviteEnabled: stockInviteToggle,
+      })
     });
 
     if (res && res.success) {
@@ -248,34 +254,34 @@
       </div>
 
       <div class="space-y-3.5 flex-1 overflow-y-auto pr-1 no-scrollbar py-1">
-        <!-- Tab 1: Informasi Utama -->
+        <!-- Tab 1: Informasi Katalog -->
         {#if activeModalTab === 'info'}
           <div class="bg-gradient-to-b from-slate-950/80 to-slate-950/40 border border-slate-800/90 rounded-2xl p-4 space-y-3.5 shadow-sm">
-            <span class="text-[11px] font-extrabold text-sky-400 uppercase tracking-wider block">📌 Informasi Utama Produk</span>
+            <span class="text-[11px] font-extrabold text-sky-400 uppercase tracking-wider block">📁 Informasi Katalog Produk</span>
             
             <div>
-              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Nama Produk <span class="text-rose-400">*</span></label>
-              <input type="text" bind:value={name} placeholder="ex: Youtube Premium" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none font-bold">
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Nama Katalog <span class="text-rose-400">*</span></label>
+              <input type="text" bind:value={name} placeholder="ex: Youtube Premium Catalog" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none font-bold">
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">URL Logo Produk</label>
+                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Upload Link Ikon APK</label>
                 <input type="text" bind:value={imageUrl} placeholder="https://..." class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none">
               </div>
               <div>
-                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Deskripsi Singkat</label>
-                <input type="text" bind:value={description} placeholder="Fitur/garansi produk..." class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none">
+                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Deskripsi Katalog</label>
+                <input type="text" bind:value={description} placeholder="Fitur/garansi/keterangan katalog..." class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none">
               </div>
             </div>
 
             <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5">
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-white">📧 Butuh Email Customer?</span>
+                  <span class="text-xs font-bold text-white">📧 Butuh Email Customer? (Invite Mode)</span>
                   <span class="text-[10px] font-bold {requiresEmail ? 'text-emerald-400' : 'text-slate-500'}">{saveStatusText}</span>
                 </div>
-                <span class="text-[10px] text-slate-400 block mt-0.5">Tampilkan tombol 'Kirim Email' setelah pembayaran sukses</span>
+                <span class="text-[10px] text-slate-400 block mt-0.5">Jika ON, pembeli akan diminta memasukkan email setelah pembayaran</span>
               </div>
               <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
                 <input type="checkbox" checked={requiresEmail} onchange={handleEmailToggle} class="sr-only peer">
@@ -341,7 +347,7 @@
               <span class="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">🛡️ Pengaturan Garansi & Renew per Varian</span>
             </div>
 
-            <div class="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar pt-1">
+            <div class="space-y-3 max-h-72 overflow-y-auto no-scrollbar pt-1">
               {#each variants as v, i}
                 <div class="bg-[#070914] border border-amber-900/30 p-3 rounded-xl space-y-2.5">
                   <div class="flex items-center justify-between border-b border-slate-800/60 pb-1.5">
@@ -349,26 +355,45 @@
                     <span class="text-[10px] font-bold text-slate-500">Rp {v.price?.toLocaleString('id-ID') || 0}</span>
                   </div>
 
-                  <div class="flex items-center justify-between bg-slate-950/80 p-2 rounded-lg border border-slate-800/60">
-                    <span class="font-extrabold text-amber-400 text-xs flex items-center gap-1">🛡️ Durasi Garansi (Hari):</span>
-                    <input type="number" min="0" placeholder="0" bind:value={v.warrantyDays} class="w-20 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-amber-300 font-bold text-center focus:outline-none" />
+                  <!-- Claim Garansi Settings -->
+                  <div class="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/60 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="font-extrabold text-amber-400 text-xs flex items-center gap-1">🛡️ Garansi & Tanggal Akhir Masa Garansi:</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span class="text-[10px] font-bold text-slate-400 block mb-1">Durasi (Hari):</span>
+                        <input type="number" min="0" placeholder="0" bind:value={v.warrantyDays} class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-amber-300 font-bold text-center focus:outline-none" />
+                      </div>
+                      <div>
+                        <span class="text-[10px] font-bold text-slate-400 block mb-1">Tanggal Akhir (Opsional):</span>
+                        <input type="date" bind:value={v.warrantyEndDate} class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none" />
+                      </div>
+                    </div>
                   </div>
 
+                  <!-- Renew Settings -->
                   <div class="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/60 space-y-2">
                     <label class="flex items-center gap-2 font-extrabold text-sky-400 text-xs cursor-pointer">
                       <input type="checkbox" bind:checked={v.renewEnabled} class="rounded border-slate-700 text-sky-500 focus:ring-0" />
-                      <span>🔄 Aktifkan Fitur Renew (Perpanjangan Akun)</span>
+                      <span>🔄 Fitur Renew (Perpanjangan Akun)</span>
                     </label>
 
                     {#if v.renewEnabled}
-                      <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/40 text-xs">
-                        <div>
-                          <span class="text-[10px] font-bold text-slate-400 block mb-1">Maksimal Renew:</span>
-                          <input type="number" min="1" placeholder="1" bind:value={v.maxRenew} class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-sky-300 font-bold text-center focus:outline-none" />
+                      <div class="space-y-2 pt-1 border-t border-slate-800/40 text-xs">
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <span class="text-[10px] font-bold text-slate-400 block mb-1">Tanggal Mulai Tombol Aktif:</span>
+                            <input type="date" bind:value={v.renewStartDate} class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-sky-300 font-bold focus:outline-none" />
+                          </div>
+                          <div>
+                            <span class="text-[10px] font-bold text-slate-400 block mb-1">Maksimal Renew:</span>
+                            <input type="number" min="1" placeholder="1" bind:value={v.maxRenew} class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-sky-300 font-bold text-center focus:outline-none" />
+                          </div>
                         </div>
                         <div>
-                          <span class="text-[10px] font-bold text-slate-400 block mb-1">Delay Renew (Hari):</span>
-                          <input type="number" min="0" placeholder="0" bind:value={v.renewDelayDays} class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-sky-300 font-bold text-center focus:outline-none" />
+                          <span class="text-[10px] font-bold text-slate-400 block mb-1">Custom Pesan Jika Belum Aktif:</span>
+                          <input type="text" placeholder="Tombol Renew belum bisa digunakan saat ini..." bind:value={v.renewNotReadyMessage} class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none" />
                         </div>
                       </div>
                     {/if}
@@ -448,6 +473,17 @@
               <span class="px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{editingProduct.stock || 0} pcs ready</span>
             </div>
 
+            <!-- Feature Toggles for Add Stock -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">⚙️ Fitur Otomatis Tambah Stok:</span>
+              <div class="flex items-center gap-4 flex-wrap text-xs">
+                <label class="flex items-center gap-1.5 font-bold text-emerald-400 cursor-pointer">
+                  <input type="checkbox" bind:checked={stockInviteToggle} class="rounded border-slate-700 text-emerald-500 focus:ring-0" />
+                  <span>✉️ Invite (Auto stok #1)</span>
+                </label>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Target Varian</label>
@@ -458,7 +494,7 @@
                 </select>
               </div>
               <div>
-                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Tanggal Expired (Opsional)</label>
+                <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Tanggal Delete Stok Otomatis (Opsional)</label>
                 <input type="date" bind:value={stockExpiry} class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 font-semibold focus:outline-none" />
               </div>
             </div>
@@ -474,8 +510,8 @@
             </div>
 
             <div>
-              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📝 Paste Teks Akun (1 per baris)</label>
-              <textarea bind:value={stockInputText} rows="3" placeholder="user1@gmail.com:pass123&#10;user2@gmail.com:pass456" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none"></textarea>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📝 Input Format Stok (1 per baris)</label>
+              <textarea bind:value={stockInputText} rows="4" placeholder="Format: User | Password | Email | F2A | Profil | Tanggal delete stok otomatis&#10;Contoh: user1 | pass123 | user1@gmail.com | 2FAKEY123 | Profile1 | 2026-12-31" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none"></textarea>
             </div>
 
             <button type="button" onclick={handleAddStock} class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer">
@@ -496,7 +532,7 @@
                     <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 gap-2">
                       <div class="truncate flex-1 min-w-0">
                         <span class="text-slate-500 font-bold mr-1">#{idx+1}</span>
-                        <span class="text-slate-200 font-semibold truncate">{escapeHTML(item.data || item.text)}</span>
+                        <span class="text-slate-200 font-semibold truncate">{escapeHTML(item.username ? `${item.username} | ${item.password}` : (item.data || item.text))}</span>
                       </div>
                       <button type="button" onclick={() => deleteStockItem(item.id)} class="px-2 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg text-[10px] font-bold cursor-pointer">🗑 Hapus</button>
                     </div>

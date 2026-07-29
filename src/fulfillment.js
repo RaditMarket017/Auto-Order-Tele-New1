@@ -227,19 +227,49 @@ async function fulfillOrder(orderId) {
  * Helper to format credential item
  */
 function formatCredentialItem(credText, index) {
-  const raw = (credText || '').toString().trim();
-  if (!raw) return `Data ${index + 1}:\n-`;
+function formatCredentialItem(credItem, index) {
+  if (!credItem) return `<b><u>AKUN #${index + 1}</u></b>\n-`;
+
+  let raw = '';
+  let username = '';
+  let password = '';
+  let email = '';
+  let f2aSecret = '';
+  let profile = '';
+
+  if (typeof credItem === 'object') {
+    raw = (credItem.data || credItem.text || '').toString().trim();
+    username = credItem.username || '';
+    password = credItem.password || '';
+    email = credItem.email || '';
+    f2aSecret = credItem.f2aSecret || '';
+    profile = credItem.profile || '';
+  } else {
+    raw = (credItem || '').toString().trim();
+  }
+
+  if (username || password || email || f2aSecret || profile) {
+    let out = `<b><u>AKUN #${index + 1}</u></b>\n`;
+    if (username) out += `👤 <b>User</b>     : <code>${escapeHTML(username)}</code>\n`;
+    if (password) out += `🔑 <b>Password</b> : <code>${escapeHTML(password)}</code>\n`;
+    if (email)    out += `📧 <b>Email</b>    : <code>${escapeHTML(email)}</code>\n`;
+    if (f2aSecret) out += `🔐 <b>F2A</b>      : <code>${escapeHTML(f2aSecret)}</code>\n`;
+    if (profile)  out += `👤 <b>Profil</b>   : <code>${escapeHTML(profile)}</code>\n`;
+    return out.trim();
+  }
 
   if (raw.includes('|')) {
     const parts = raw.split('|').map(s => s.trim());
-    if (parts.length >= 3) {
-      return `Data ${index + 1}:\nUsername: ${parts[0]}\nE-mail: ${parts[1]}\nPassword: ${parts[2]}`;
-    } else if (parts.length === 2) {
-      return `Data ${index + 1}:\nE-mail: ${parts[0]}\nPassword: ${parts[1]}`;
-    }
+    let out = `<b><u>AKUN #${index + 1}</u></b>\n`;
+    if (parts[0]) out += `👤 <b>User</b>     : <code>${escapeHTML(parts[0])}</code>\n`;
+    if (parts[1]) out += `🔑 <b>Password</b> : <code>${escapeHTML(parts[1])}</code>\n`;
+    if (parts[2]) out += `📧 <b>Email</b>    : <code>${escapeHTML(parts[2])}</code>\n`;
+    if (parts[3]) out += `🔐 <b>F2A</b>      : <code>${escapeHTML(parts[3])}</code>\n`;
+    if (parts[4]) out += `👤 <b>Profil</b>   : <code>${escapeHTML(parts[4])}</code>\n`;
+    return out.trim();
   }
 
-  return `Data ${index + 1}:\n${raw}`;
+  return `<b><u>AKUN #${index + 1}</u></b>\n<code>${escapeHTML(raw)}</code>`;
 }
 
 function formatAllCredentialsText(credentials) {
@@ -281,10 +311,10 @@ async function autoFulfill(orderId, order, orderRef) {
         orderId,
         usedAt: new Date().toISOString(),
       });
-      credentials.push(credDoc.data().data);
+      credentials.push(credDoc.data());
     }
 
-    const credText = credentials.join('\n');
+    const credText = credentials.map(c => typeof c === 'object' ? (c.data || c.text || '') : c).join('\n');
 
     let variantNotes = '';
     let warrantyDays = Number(order.warrantyDays || 0);
@@ -375,11 +405,12 @@ async function autoFulfill(orderId, order, orderRef) {
 
       if (qty === 1) {
         // Quantity = 1: Send as TEXT MESSAGE directly
-        let msgText = `🔑 <b>DATA PESANAN ANDA:</b>\n\n${escapeHTML(formatCredentialItem(credentials[0], 0))}\n\n✅ <b>ORDER BERHASIL</b>`;
+        let msgText = `🔑 <b>DATA PESANAN ANDA:</b>\n\n${formatCredentialItem(credentials[0], 0)}\n\n✅ <b>ORDER BERHASIL</b>`;
         if (variantNotes) {
           msgText += `\n\n${escapeHTML(variantNotes)}`;
         }
         msgText += extraMsg;
+        msgText += `\n\n💬 <i>Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.</i>`;
 
         await bot.telegram.sendMessage(order.telegramUserId, msgText, replyOptions).catch(() => {});
       } else {
@@ -402,6 +433,7 @@ async function autoFulfill(orderId, order, orderRef) {
           msgText += `\n\n${escapeHTML(variantNotes)}`;
         }
         msgText += extraMsg;
+        msgText += `\n\n💬 <i>Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.</i>`;
 
         await bot.telegram.sendMessage(order.telegramUserId, msgText, replyOptions).catch(() => {});
       }

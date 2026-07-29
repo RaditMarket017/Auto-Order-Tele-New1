@@ -220,16 +220,21 @@ router.post('/products', async (req, res) => {
 
     const sanitizedVariants = (variants || []).map(v => ({
       label: v.label || 'Default',
+      description: v.description || '',
       price: Number(v.price || 0),
       stock: Number(v.stock || 0),
       warrantyDays: Number(v.warrantyDays || 0),
+      warrantyEndDate: v.warrantyEndDate || '',
       renewEnabled: Boolean(v.renewEnabled),
+      renewStartDate: v.renewStartDate || '',
       maxRenew: Number(v.maxRenew || 1),
       renewDelayDays: Number(v.renewDelayDays || 0),
+      renewNotReadyMessage: v.renewNotReadyMessage || '',
+      inviteEnabled: Boolean(v.inviteEnabled),
       notes: v.notes || '',
     }));
     if (sanitizedVariants.length === 0) {
-      sanitizedVariants.push({ label: 'Default', price: computedBasePrice, stock: 0, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' });
+      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
     }
 
     const docRef = await db.collection('products').add({
@@ -263,16 +268,21 @@ router.put('/products/:id', async (req, res) => {
 
     const sanitizedVariants = (variants || []).map(v => ({
       label: v.label || 'Default',
+      description: v.description || '',
       price: Number(v.price || 0),
       stock: Number(v.stock || 0),
       warrantyDays: Number(v.warrantyDays || 0),
+      warrantyEndDate: v.warrantyEndDate || '',
       renewEnabled: Boolean(v.renewEnabled),
+      renewStartDate: v.renewStartDate || '',
       maxRenew: Number(v.maxRenew || 1),
       renewDelayDays: Number(v.renewDelayDays || 0),
+      renewNotReadyMessage: v.renewNotReadyMessage || '',
+      inviteEnabled: Boolean(v.inviteEnabled),
       notes: v.notes || '',
     }));
     if (sanitizedVariants.length === 0) {
-      sanitizedVariants.push({ label: 'Default', price: computedBasePrice, stock: 0, warrantyDays: 0, renewEnabled: false, maxRenew: 1, renewDelayDays: 0, notes: '' });
+      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
     }
 
     const updateData = {
@@ -352,9 +362,13 @@ router.post('/stock/:productId', async (req, res) => {
 
     const poolCol = db.collection('credentials_pool');
     const batch = db.batch();
-    lines.forEach(text => {
+    const isInvite = Boolean(req.body.inviteEnabled);
+
+    lines.forEach((text, idx) => {
       const ref = poolCol.doc();
-      batch.set(ref, {
+      const parts = text.split('|').map(p => p.trim());
+      
+      let parsedItem = {
         productId: req.params.productId,
         variantLabel: targetVariantLabel,
         data: text,
@@ -362,7 +376,32 @@ router.post('/stock/:productId', async (req, res) => {
         isUsed: false,
         expiredAt: computedExpiredAt,
         addedAt: new Date().toISOString(),
-      });
+        isInviteItem: isInvite && idx === 0, // Apply invite feature to 1st item in batch if enabled
+      };
+
+      if (parts.length > 1) {
+        parsedItem.username = parts[0] || '';
+        parsedItem.password = parts[1] || '';
+        parsedItem.email = parts[2] || '';
+        parsedItem.f2aSecret = parts[3] || '';
+        parsedItem.profile = parts[4] || '';
+
+        const deleteInput = parts[5] || '';
+        if (deleteInput) {
+          if (!isNaN(parseInt(deleteInput)) && !deleteInput.includes('-') && !deleteInput.includes('/')) {
+            const d = new Date();
+            d.setDate(d.getDate() + parseInt(deleteInput));
+            parsedItem.expiredAt = d.toISOString();
+          } else {
+            const parsedD = new Date(deleteInput);
+            if (!isNaN(parsedD.getTime())) {
+              parsedItem.expiredAt = parsedD.toISOString();
+            }
+          }
+        }
+      }
+
+      batch.set(ref, parsedItem);
     });
 
     await batch.commit();

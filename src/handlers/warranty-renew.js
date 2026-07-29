@@ -24,7 +24,10 @@ async function getStoreSettings() {
  */
 function getWarrantyInfo(order) {
   const warrantyDays = Number(order.warrantyDays || 0);
-  if (warrantyDays <= 0) {
+  const warrantyEndDate = order.warrantyEndDate ? new Date(order.warrantyEndDate).getTime() : null;
+  const nowMs = Date.now();
+
+  if (warrantyDays <= 0 && !warrantyEndDate) {
     return { hasWarranty: false, isExpired: true, alreadyClaimed: false, remainingStr: 'Tidak ada garansi' };
   }
 
@@ -35,21 +38,27 @@ function getWarrantyInfo(order) {
     order.warrantyClaimStatus === 'expired_timeout';
 
   if (alreadyClaimed) {
+    const isTimeout = order.warrantyClaimStatus === 'expired_timeout';
     return {
       hasWarranty: true,
       alreadyClaimed: true,
       isExpired: false,
-      remainingStr: order.warrantyClaimStatus === 'expired_timeout' ? 'Garansi Hangus (Batas Waktu Upload)' : 'Klaim Garansi Telah Digunakan (1x)',
+      isTimeout,
+      remainingStr: isTimeout ? 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.' : 'Klaim Garansi Telah Digunakan (1x)',
       warrantyDays,
     };
   }
 
-  const startMs = order.deliveredAt ? new Date(order.deliveredAt).getTime() : new Date(order.createdAt || Date.now()).getTime();
-  const expireMs = startMs + (warrantyDays * 86400 * 1000);
-  const nowMs = Date.now();
+  let expireMs = 0;
+  if (warrantyEndDate) {
+    expireMs = warrantyEndDate;
+  } else {
+    const startMs = order.deliveredAt ? new Date(order.deliveredAt).getTime() : new Date(order.createdAt || Date.now()).getTime();
+    expireMs = startMs + (warrantyDays * 86400 * 1000);
+  }
 
   if (nowMs >= expireMs) {
-    return { hasWarranty: true, alreadyClaimed: false, isExpired: true, remainingStr: 'Garansi Expired', warrantyDays };
+    return { hasWarranty: true, alreadyClaimed: false, isExpired: true, remainingStr: 'Mohon maaf, garansi sudah tidak berlaku.', warrantyDays };
   }
 
   const diffMs = expireMs - nowMs;
@@ -92,19 +101,24 @@ function getRenewInfo(order) {
     return { renewEnabled: true, isMaxReached: false, isReady: false, isPending: true, waitStr: 'Diproses Admin', renewCount, maxRenew };
   }
 
-  const renewDelayDays = Number(order.renewDelayDays || 0);
-  const startMs = order.deliveredAt ? new Date(order.deliveredAt).getTime() : new Date(order.createdAt || Date.now()).getTime();
-  const nextAvailableMs = startMs + ((renewCount + 1) * renewDelayDays * 86400 * 1000);
   const nowMs = Date.now();
+  let nextAvailableMs = 0;
 
-  if (nowMs >= nextAvailableMs || renewDelayDays <= 0) {
+  if (order.renewStartDate) {
+    nextAvailableMs = new Date(order.renewStartDate).getTime();
+  } else {
+    const renewDelayDays = Number(order.renewDelayDays || 0);
+    const startMs = order.deliveredAt ? new Date(order.deliveredAt).getTime() : new Date(order.createdAt || Date.now()).getTime();
+    nextAvailableMs = startMs + ((renewCount + 1) * renewDelayDays * 86400 * 1000);
+  }
+
+  if (nowMs >= nextAvailableMs || !nextAvailableMs) {
     return {
       renewEnabled: true,
       isMaxReached: false,
       isReady: true,
       renewCount,
       maxRenew,
-      renewDelayDays,
     };
   }
 
@@ -126,7 +140,7 @@ function getRenewInfo(order) {
     waitStr: waitStr.trim(),
     renewCount,
     maxRenew,
-    renewDelayDays,
+    customNotReadyMessage: order.renewNotReadyMessage || '',
   };
 }
 
@@ -298,12 +312,13 @@ function registerWarrantyRenewHandlers(bot) {
       }
 
       if (!renewInfo.isReady) {
-        return safeEditMessage(ctx,
+        const notReadyText = renewInfo.customNotReadyMessage ||
           `⏳ <b>RENEW BELUM TERSEDIA</b>\n` +
           `────────────────────────────\n` +
           `• <b>Status</b>: Silakan tunggu <b>${renewInfo.waitStr}</b> lagi.\n` +
-          `• <b>Renew Ke</b>: <b>${renewInfo.renewCount + 1} dari ${renewInfo.maxRenew}x</b>\n\n` +
-          `<i>Sistem akan membuka tombol Renew secara otomatis setelah jeda waktu terpenuhi.</i>`
+          `• <b>Renew Ke</b>: <b>${renewInfo.renewCount + 1} dari ${renewInfo.maxRenew}x</b>`;
+        return safeEditMessage(ctx,
+          `${notReadyText}\n\n💬 <i>Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.</i>`
         );
       }
 
@@ -455,14 +470,18 @@ function registerWarrantyRenewHandlers(bot) {
       const warrantyInfo = getWarrantyInfo(order);
 
       if (warrantyInfo.alreadyClaimed) {
-        return ctx.answerCbQuery('⚠️ Klaim garansi untuk pesanan ini telah digunakan (maksimal 1x) atau telah hangus.', { show_alert: true });
+        const claimText = warrantyInfo.isTimeout
+          ? '⚠️ Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.'
+          : '⚠️ Klaim garansi untuk pesanan ini telah digunakan (maksimal 1x).';
+        return ctx.answerCbQuery(`${claimText}\nJika ada kendala, silakan hubungi CS kami.`, { show_alert: true });
       }
 
       if (!warrantyInfo.hasWarranty || warrantyInfo.isExpired) {
         return safeEditMessage(ctx,
-          `<b>⚠️ MASA GARANSI BERAKHIR</b>\n` +
+          `<b>⚠️ MOHON MAAF, GARANSI SUDAH TIDAK BERLAKU</b>\n` +
           `────────────────────────────\n` +
-          `> <i>Maaf, masa garansi (${warrantyInfo.warrantyDays || 0} hari) untuk order <code>${escapeHTML(order.id)}</code> sudah berakhir.</i>`
+          `> <i>Mohon maaf, garansi sudah tidak berlaku untuk order <code>${escapeHTML(order.id)}</code>.</i>\n\n` +
+          `💬 <i>Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.</i>`
         );
       }
 
