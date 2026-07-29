@@ -91,7 +91,7 @@
     <div class="space-y-3">
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Nama Toko</label>
-        <input type="text" bind:value={storeName} placeholder="PanzzStore" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={storeName} placeholder="AutoStore" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">URL Logo Toko / Banner</label>
@@ -99,15 +99,15 @@
       </div>
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Nomor WhatsApp CS</label>
-        <input type="text" bind:value={contactWhatsapp} placeholder="628988999399" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={contactWhatsapp} placeholder="628xxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Username Telegram CS</label>
-        <input type="text" bind:value={contactTelegram} placeholder="miminpanz" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={contactTelegram} placeholder="adminusername" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Link Group Telegram</label>
-        <input type="text" bind:value={groupTelegram} placeholder="t.me/panzzstoreeid" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={groupTelegram} placeholder="t.me/yourgroup" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
     </div>
   </div>
@@ -144,11 +144,11 @@
     <div class="space-y-3">
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Username / ID Channel Wajib Join</label>
-        <input type="text" bind:value={requiredChannelId} placeholder="@panzzstoreeid atau -100xxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={requiredChannelId} placeholder="@channelusername atau -100xxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Link Join Channel (Undangan)</label>
-        <input type="text" bind:value={requiredChannelLink} placeholder="https://t.me/panzzstoreeid" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
+        <input type="text" bind:value={requiredChannelLink} placeholder="https://t.me/channelusername" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-sky-500 focus:outline-none">
       </div>
       <button onclick={saveSettings} class="w-full py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all cursor-pointer">
         Simpan Pengaturan

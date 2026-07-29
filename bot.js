@@ -20,6 +20,7 @@ const { handleBalancePayment, handleQRISPayment, handleTopupQRIS, checkPaymentSt
 const { showAdminMenu, handleAdminAction, handleAdmAction, handleAdminText, handleAdminDocument, clearAdminSession } = require('./src/handlers/admin');
 const { showTMailMenu, handleTMailAction } = require('./src/handlers/tmail-handler');
 const { registerWarrantyRenewHandlers, getWarrantyInfo, getRenewInfo, buildOrderActionButtons } = require('./src/handlers/warranty-renew');
+const { getStoreRatingStats, registerReviewHandlers, handleReviewTextInput } = require('./src/handlers/reviews');
 const { createWebhookServer } = require('./src/webhook');
 
 // Telegraf options (Proxy support)
@@ -35,6 +36,7 @@ if (process.env.TELEGRAM_PROXY) {
 
 const bot = new Telegraf(config.BOT_TOKEN, botOptions);
 registerWarrantyRenewHandlers(bot);
+registerReviewHandlers(bot);
 
 // ═══════════════════════════════════════
 // HELPERS
@@ -168,18 +170,26 @@ async function sendWelcomeMessage(ctx) {
   const userId = ctx.from.id;
   const lang = await getUserLang(userId);
 
-  // Get stats
-  const [userDoc, usersCountSnap, soldSnap] = await Promise.all([
+  // Get stats & rating info
+  const [userDoc, ratingStats, storeDocSnap] = await Promise.all([
     db.collection('bot_users').doc(userId.toString()).get(),
-    db.collection('bot_users').count().get(),
-    db.collection('orders').where('status', 'in', ['success', 'paid']).count().get(),
+    getStoreRatingStats(),
+    db.collection('settings').doc('store').get().catch(() => null),
   ]);
 
   const userData = userDoc.data() || {};
   const { dateStr, timeStr } = formatDateID(new Date());
 
+  let storeName = config.STORE_NAME;
+  let bannerUrl = config.STORE_BANNER_URL;
+  if (storeDocSnap && storeDocSnap.exists) {
+    const sData = storeDocSnap.data();
+    if (sData.storeName) storeName = sData.storeName;
+    if (sData.bannerUrl) bannerUrl = sData.bannerUrl;
+  }
+
   const msg = t(lang, 'welcome', {
-    storeName: escapeHTML(config.STORE_NAME),
+    storeName: escapeHTML(storeName),
     name: escapeHTML(ctx.from.first_name || 'User'),
     dateStr,
     timeStr,
@@ -187,17 +197,12 @@ async function sendWelcomeMessage(ctx) {
     username: escapeHTML(ctx.from.username || '-'),
     totalTransaksi: userData.totalOrders || 0,
     balance: formatIDR(userData.balance || 0),
-    totalSold: soldSnap.data().count || 0,
-    totalUsers: usersCountSnap.data().count || 0,
+    ratingAverage: ratingStats.averageRating,
+    totalReviews: ratingStats.totalReviews,
+    totalSold: ratingStats.totalSold,
+    totalUsers: ratingStats.totalUsers,
+    topProduct: escapeHTML(ratingStats.topProduct),
   });
-
-  let bannerUrl = config.STORE_BANNER_URL;
-  try {
-    const storeDoc = await db.collection('settings').doc('store').get();
-    if (storeDoc.exists && storeDoc.data().bannerUrl) {
-      bannerUrl = storeDoc.data().bannerUrl;
-    }
-  } catch { }
 
   if (bannerUrl) {
     try {
@@ -813,7 +818,40 @@ bot.on('callback_query', async (ctx) => {
     if (!orderDoc.exists) return ctx.answerCbQuery('Order tidak ditemukan.').catch(() => { });
 
     const orderData = orderDoc.data();
-    await orderRef.update({ inviteStatus: 'done', status: 'success' });
+
+    let warrantyDays = Number(orderData.warrantyDays || 0);
+    let renewEnabled = Boolean(orderData.renewEnabled);
+    let maxRenew = Number(orderData.maxRenew || 1);
+    let renewDelayDays = Number(orderData.renewDelayDays || 0);
+
+    if (orderData.productId && (!orderData.deliveredAt || !orderData.warrantyDays)) {
+      try {
+        const pDoc = await db.collection('products').doc(orderData.productId).get();
+        if (pDoc.exists) {
+          const pData = pDoc.data();
+          const variant = (pData.variants || []).find(v => v.label === orderData.variantLabel) || pData.variants?.[0];
+          if (variant) {
+            warrantyDays = Number(variant.warrantyDays || 0);
+            renewEnabled = Boolean(variant.renewEnabled);
+            maxRenew = Number(variant.maxRenew || 1);
+            renewDelayDays = Number(variant.renewDelayDays || 0);
+          }
+        }
+      } catch (e) {}
+    }
+
+    const deliveredAt = new Date().toISOString();
+
+    await orderRef.update({
+      inviteStatus: 'done',
+      status: 'success',
+      deliveredAt,
+      warrantyDays,
+      renewEnabled,
+      maxRenew,
+      renewDelayDays,
+      renewCount: orderData.renewCount || 0,
+    });
 
     ctx.answerCbQuery('✅ Status Invite diubah ke Done!').catch(() => { });
 
@@ -829,6 +867,24 @@ bot.on('callback_query', async (ctx) => {
     await ctx.editMessageText(updatedOwnerMsg, { parse_mode: 'HTML' }).catch(() => { });
 
     if (orderData.telegramUserId && orderData.telegramUserId !== 'guest') {
+      const updatedOrder = {
+        ...orderData,
+        id: orderId,
+        status: 'success',
+        deliveredAt,
+        warrantyDays,
+        renewEnabled,
+        maxRenew,
+        renewDelayDays,
+        renewCount: orderData.renewCount || 0,
+      };
+
+      const actionButtons = buildOrderActionButtons(updatedOrder);
+      let replyOptions = { parse_mode: 'HTML' };
+      if (actionButtons.length > 0) {
+        replyOptions = { parse_mode: 'HTML', ...Markup.inlineKeyboard(actionButtons) };
+      }
+
       const customerMsg =
         `✅ <b>INVITE BERHASIL!</b>\n` +
         `────────────────────────────\n` +
@@ -837,11 +893,19 @@ bot.on('callback_query', async (ctx) => {
         `🎉 <i>Invite telah berhasil dikirim! Silakan cek email atau akun Anda.</i>`;
 
       if (orderData.customerMsgId) {
-        await bot.telegram.editMessageText(orderData.telegramUserId, orderData.customerMsgId, null, customerMsg, { parse_mode: 'HTML' }).catch(() => {
-          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
+        await bot.telegram.editMessageText(orderData.telegramUserId, orderData.customerMsgId, null, customerMsg, replyOptions).catch(() => {
+          bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, replyOptions).catch(() => { });
         });
       } else {
-        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, { parse_mode: 'HTML' }).catch(() => { });
+        await bot.telegram.sendMessage(orderData.telegramUserId, customerMsg, replyOptions).catch(() => { });
+      }
+
+      // Send Rating & Review prompt to user
+      try {
+        const { sendRatingPrompt } = require('./src/handlers/reviews');
+        await sendRatingPrompt(bot, orderData.telegramUserId, orderId);
+      } catch (rErr) {
+        console.error('Error sending rating prompt for invite:', rErr.message);
       }
     }
 
@@ -1199,6 +1263,12 @@ bot.on('text', async (ctx) => {
 
     await updateSession(ctx.from.id, { inviteState: null, cancelOrderId: null, cancelOwnerMsgId: null });
     await processCancelInvite(ctx, orderId, reason, ownerMsgId);
+    return;
+  }
+
+  // 3. User review comment text input
+  if (session.awaitingReviewOrderId) {
+    await handleReviewTextInput(ctx, session);
     return;
   }
 

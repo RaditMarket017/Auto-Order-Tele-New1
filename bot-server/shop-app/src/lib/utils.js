@@ -15,11 +15,24 @@ export function getTelegramUser() {
   const urlParams = new URLSearchParams(window.location.search);
   const tgUser = tg?.initDataUnsafe?.user;
   const urlUserId = urlParams.get('user_id');
-  const urlName = urlParams.get('name') || urlParams.get('first_name') || urlParams.get('username');
+  const urlPhoto = urlParams.get('photo_url') || urlParams.get('photo');
+
+  let name = '';
+  if (tgUser?.first_name) {
+    name = `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}`.trim();
+  } else if (urlName) {
+    name = urlName;
+  } else {
+    name = 'Member';
+  }
+
+  const resolvedId = tgUser?.id ? String(tgUser.id) : (urlUserId ? String(urlUserId) : '5665721422');
 
   return {
-    id: tgUser?.id || urlUserId || '5665721422',
-    first_name: tgUser?.first_name || urlName || (tgUser?.username ? '@' + tgUser.username : 'Member PanzzStore'),
+    id: resolvedId,
+    first_name: name,
+    photo_url: tgUser?.photo_url || urlPhoto || '',
+    tgUser,
     tg
   };
 }

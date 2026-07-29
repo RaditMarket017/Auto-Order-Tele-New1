@@ -11,9 +11,10 @@
   // State
   let allProducts = $state([]);
   let filteredProducts = $state([]);
-  let storeName = $state('PanzzStore');
+  let storeName = $state('Store');
   let storeLogoUrl = $state('');
   let userName = $state('Member');
+  let userPhotoUrl = $state('');
   let userBalance = $state(0);
   let userId = $state('');
   let loading = $state(true);
@@ -35,9 +36,10 @@
   let tgRef = null;
 
   onMount(async () => {
-    const { id, first_name, tg } = getTelegramUser();
+    const { id, first_name, photo_url, tg } = getTelegramUser();
     userId = id;
     userName = first_name;
+    userPhotoUrl = photo_url || '';
     tgRef = tg;
 
     try {
@@ -52,12 +54,23 @@
         userBalance = userRes.data.balance || 0;
         const tgUser = tg?.initDataUnsafe?.user;
         const urlName = new URLSearchParams(window.location.search).get('name');
-        userName = tgUser?.first_name || (userRes.data.name !== 'Member PanzzStore' ? userRes.data.name : null) || urlName || 'Member PanzzStore';
+
+        if (tgUser?.first_name) {
+          userName = `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}`.trim();
+        } else if (urlName) {
+          userName = urlName;
+        } else if (userRes.data.name && !userRes.data.name.startsWith('Member')) {
+          userName = userRes.data.name;
+        } else if (userRes.data.firstName) {
+          userName = `${userRes.data.firstName}${userRes.data.lastName ? ' ' + userRes.data.lastName : ''}`.trim();
+        } else {
+          userName = 'Member';
+        }
       }
 
       // Store info
       if (infoRes?.success) {
-        storeName = infoRes.data.storeName || 'PanzzStore';
+        storeName = infoRes.data.storeName || 'Store';
         storeLogoUrl = infoRes.data.storeLogoUrl || '';
         if (infoRes.data.maintenanceMode) {
           isMaintenanceMode = true;
@@ -140,7 +153,7 @@
 </script>
 
 <div class="min-h-screen flex flex-col">
-  <Header {storeName} {storeLogoUrl} {userName} {userBalance} />
+  <Header {storeName} {storeLogoUrl} {userName} {userBalance} {userPhotoUrl} />
 
   <main class="flex-1 max-w-2xl mx-auto w-full px-4 py-4 space-y-4">
     <!-- Maintenance Banner -->

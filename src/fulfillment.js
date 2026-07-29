@@ -96,6 +96,11 @@ async function fulfillOrder(orderId) {
 
     // ═══ PRODUCT — EMAIL INVITE DELIVERY ═══
     if (isRequiresEmail) {
+      let warrantyDays = Number(order.warrantyDays || 0);
+      let renewEnabled = Boolean(order.renewEnabled);
+      let maxRenew = Number(order.maxRenew || 1);
+      let renewDelayDays = Number(order.renewDelayDays || 0);
+
       // Decrement manual variant stock if set
       if (order.productId) {
         try {
@@ -105,9 +110,16 @@ async function fulfillOrder(orderId) {
             const pData = pDoc.data();
             const variants = pData.variants || [];
             const vIdx = order.variantIndex !== undefined ? order.variantIndex : variants.findIndex(v => v.label === order.variantLabel);
-            if (vIdx >= 0 && variants[vIdx] && variants[vIdx].stock > 0) {
-              variants[vIdx].stock = Math.max(0, variants[vIdx].stock - (order.quantity || 1));
-              await pRef.update({ variants, updatedAt: new Date().toISOString() });
+            const variant = (vIdx >= 0 && variants[vIdx]) ? variants[vIdx] : variants[0];
+            if (variant) {
+              if (variant.warrantyDays !== undefined) warrantyDays = Number(variant.warrantyDays || 0);
+              if (variant.renewEnabled !== undefined) renewEnabled = Boolean(variant.renewEnabled);
+              if (variant.maxRenew !== undefined) maxRenew = Number(variant.maxRenew || 1);
+              if (variant.renewDelayDays !== undefined) renewDelayDays = Number(variant.renewDelayDays || 0);
+              if (variant.stock > 0) {
+                variants[vIdx].stock = Math.max(0, variants[vIdx].stock - (order.quantity || 1));
+                await pRef.update({ variants, updatedAt: new Date().toISOString() });
+              }
             }
           }
         } catch (e) {
@@ -119,6 +131,10 @@ async function fulfillOrder(orderId) {
         status: 'processing',
         requiresEmail: true,
         inviteStatus: 'waiting_email_input',
+        warrantyDays,
+        renewEnabled,
+        maxRenew,
+        renewDelayDays,
         updatedAt: new Date().toISOString(),
       });
 
@@ -388,6 +404,14 @@ async function autoFulfill(orderId, order, orderRef) {
         msgText += extraMsg;
 
         await bot.telegram.sendMessage(order.telegramUserId, msgText, replyOptions).catch(() => {});
+      }
+
+      // Send Rating & Review prompt to user
+      try {
+        const { sendRatingPrompt } = require('./handlers/reviews');
+        await sendRatingPrompt(bot, order.telegramUserId, orderId);
+      } catch (rErr) {
+        console.error('Error sending rating prompt:', rErr.message);
       }
     }
 

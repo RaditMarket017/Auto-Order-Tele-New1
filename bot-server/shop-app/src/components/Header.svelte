@@ -1,5 +1,5 @@
 <script>
-  let { storeName = 'PanzzStore', storeLogoUrl = '', userName = 'Member', userBalance = 0 } = $props();
+  let { storeName = 'Store', storeLogoUrl = '', userName = 'Member', userBalance = 0, userPhotoUrl = '' } = $props();
 
   const initial = $derived((userName || 'M').charAt(0).toUpperCase());
 </script>
@@ -33,9 +33,13 @@
         <p class="text-xs font-extrabold text-white truncate max-w-[110px]">{userName}</p>
         <p class="text-[10px] text-violet-300 font-bold font-mono">Saldo: {userBalance.toLocaleString('id-ID')}</p>
       </div>
-      <div class="w-8.5 h-8.5 rounded-xl bg-gradient-to-br from-violet-600/40 to-indigo-600/40 border border-violet-400/40 flex items-center justify-center text-violet-200 font-black text-xs shadow-lg shadow-violet-500/20">
-        {initial}
-      </div>
+      {#if userPhotoUrl}
+        <img src={userPhotoUrl} alt={userName} class="w-8.5 h-8.5 rounded-xl object-cover border border-violet-400/40 shadow-lg shadow-violet-500/20" />
+      {:else}
+        <div class="w-8.5 h-8.5 rounded-xl bg-gradient-to-br from-violet-600/40 to-indigo-600/40 border border-violet-400/40 flex items-center justify-center text-violet-200 font-black text-xs shadow-lg shadow-violet-500/20">
+          {initial}
+        </div>
+      {/if}
     </div>
   </div>
 </header>

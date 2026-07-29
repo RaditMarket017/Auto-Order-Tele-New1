@@ -415,8 +415,23 @@ async function handleApproveOrder(ctx, orderId) {
     const doc = await db.collection('orders').doc(orderId).get();
     if (!doc.exists) return ctx.answerCbQuery('Order tidak ditemukan.', { show_alert: true }).catch(() => {});
 
+    const orderData = doc.data();
+    await db.collection('orders').doc(orderId).update({ status: 'success' });
+
     const { fulfillOrder } = require('../fulfillment');
     await fulfillOrder(orderId);
+
+    // Send rating prompt to customer
+    if (orderData.telegramUserId && orderData.telegramUserId !== 'guest') {
+      try {
+        const { sendRatingPrompt } = require('./reviews');
+        const { Telegraf } = require('telegraf');
+        const bot = new Telegraf(process.env.BOT_TOKEN);
+        await sendRatingPrompt(bot, orderData.telegramUserId, orderId);
+      } catch (rErr) {
+        console.error('Error sending rating prompt for approved order:', rErr.message);
+      }
+    }
 
     ctx.answerCbQuery('✅ Order di-approve!').catch(() => {});
     ctx.editMessageText(`✅ Order <code>${escapeHTML(orderId)}</code> telah di-approve dan diproses.`, { parse_mode: 'HTML' }).catch(() => {});

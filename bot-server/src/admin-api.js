@@ -148,9 +148,10 @@ router.get('/reports/export', async (req, res) => {
     const { Telegraf } = require('telegraf');
     const bot = new Telegraf(token);
 
+    const storeCleanName = (config.STORE_NAME || 'Store').replace(/[^a-zA-Z0-9]/g, '_');
     await bot.telegram.sendDocument(targetAdminId, {
       source: buffer,
-      filename: `Laporan_Penjualan_PanzzStore_${new Date().toISOString().substring(0, 10)}.xlsx`
+      filename: `Laporan_Penjualan_${storeCleanName}_${new Date().toISOString().substring(0, 10)}.xlsx`
     }, {
       caption: `📊 <b>Laporan Penjualan Excel</b>\n\nTotal Transaksi: <b>${docs.length}</b> orders\nTanggal: <code>${new Date().toLocaleString('id-ID')}</code>`,
       parse_mode: 'HTML'

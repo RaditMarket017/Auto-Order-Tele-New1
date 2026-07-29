@@ -6,9 +6,11 @@ const translations = {
   id: {
     // ─── Start / Welcome ───
     welcome:
-      '⚡ <b><u>{{storeName}} AUTOMATION</u></b>\n' +
-      '<i>Pusat Layanan &amp; Produk Digital Premium</i>\n\n' +
-      '👋 Halo, <b>{{name}}</b>\n\n' +
+      '⚡ <b><u>{{storeName}}</u></b>\n' +
+      '<i>Pusat Layanan &amp; Produk Digital Premium</i>\n' +
+      '────────────────────────────\n' +
+      '🟢 <b>STATUS SISTEM: ONLINE (24/7)</b>\n\n' +
+      '👋 Halo, <b>{{name}}</b>!\n\n' +
       '<blockquote>' +
       '<b>👤 PROFIL PENGGUNA</b>\n' +
       '━━━━━━━━━━━━━━━━━\n' +
@@ -20,8 +22,10 @@ const translations = {
       '<blockquote>' +
       '<b>📊 STATISTIK TOKO</b>\n' +
       '━━━━━━━━━━━━━━━━━\n' +
-      '• <b>Terjual</b>   : <b>{{totalSold}}</b> pcs\n' +
-      '• <b>Member</b>    : <b>{{totalUsers}}</b> akun' +
+      '• <b>⭐ Rating</b>   : <b>{{ratingAverage}} / 5.0</b> [ <i>{{totalReviews}} reviews</i> ]\n' +
+      '• <b>📦 Terjual</b>  : <b>{{totalSold}}</b> pcs\n' +
+      '• <b>👥 Member</b>   : <b>{{totalUsers}}</b> akun\n' +
+      '• <b>🔥 Terlaris</b> : <b>{{topProduct}}</b>' +
       '</blockquote>\n\n' +
       '⏰ <i>{{dateStr}} — {{timeStr}} WIB</i>\n\n' +
       '💡 <i>Gunakan menu di bawah untuk transaksi!</i>',
@@ -262,9 +266,11 @@ const translations = {
   en: {
     // ─── Start / Welcome ───
     welcome:
-      '⚡ <b><u>{{storeName}} AUTOMATION</u></b>\n' +
-      '<i>Premium Digital Goods Service Center</i>\n\n' +
-      '👋 Hello, <b>{{name}}</b>\n\n' +
+      '⚡ <b><u>{{storeName}}</u></b>\n' +
+      '<i>Premium Digital Goods Service Center</i>\n' +
+      '────────────────────────────\n' +
+      '🟢 <b>SYSTEM STATUS: ONLINE (24/7)</b>\n\n' +
+      '👋 Hello, <b>{{name}}</b>!\n\n' +
       '<blockquote>' +
       '<b>👤 USER PROFILE</b>\n' +
       '━━━━━━━━━━━━━━━━━\n' +
@@ -276,8 +282,10 @@ const translations = {
       '<blockquote>' +
       '<b>📊 STORE STATS</b>\n' +
       '━━━━━━━━━━━━━━━━━\n' +
-      '• <b>Total Sold</b>  : <b>{{totalSold}}</b> pcs\n' +
-      '• <b>Members</b>     : <b>{{totalUsers}}</b> users' +
+      '• <b>⭐ Rating</b>   : <b>{{ratingAverage}} / 5.0</b> [ <i>{{totalReviews}} reviews</i> ]\n' +
+      '• <b>📦 Total Sold</b>: <b>{{totalSold}}</b> pcs\n' +
+      '• <b>👥 Members</b>   : <b>{{totalUsers}}</b> users\n' +
+      '• <b>🔥 Best Seller</b>: <b>{{topProduct}}</b>' +
       '</blockquote>\n\n' +
       '⏰ <i>{{dateStr}} — {{timeStr}} WIB</i>\n\n' +
       '💡 <i>Use the menu buttons below to get started!</i>',

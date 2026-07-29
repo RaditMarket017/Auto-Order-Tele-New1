@@ -10,19 +10,23 @@ const { createPayment } = require('../../src/ramashop');
 router.get('/user-profile', async (req, res) => {
   try {
     const userId = req.query.user_id;
-    if (!userId) return res.json({ success: true, data: { name: 'Member PanzzStore', balance: 0 } });
+    const defaultMemberName = `Member ${config.STORE_NAME || 'Store'}`;
+    if (!userId) return res.json({ success: true, data: { name: defaultMemberName, balance: 0 } });
 
     const userDoc = await db.collection('bot_users').doc(String(userId)).get();
     if (!userDoc.exists) {
-      return res.json({ success: true, data: { name: 'Member PanzzStore', balance: 0 } });
+      return res.json({ success: true, data: { name: defaultMemberName, balance: 0 } });
     }
 
     const u = userDoc.data();
+    let displayName = u.firstName ? `${u.firstName}${u.lastName ? ' ' + u.lastName : ''}`.trim() : (u.name || 'Member');
+    if (!displayName) displayName = 'Member';
+
     res.json({
       success: true,
       data: {
         id: userId,
-        name: u.firstName || u.name || (u.username ? '@' + u.username : 'Member PanzzStore'),
+        name: displayName,
         username: u.username || '',
         balance: u.balance || 0,
         role: u.role || 'user',
@@ -200,7 +204,7 @@ router.post('/create-order', async (req, res) => {
     const orderId = generateOrderId('ORD');
 
     let finalCustomerName = customerName;
-    if (!finalCustomerName || finalCustomerName === 'Member PanzzStore' || finalCustomerName === 'User' || finalCustomerName === 'Guest') {
+    if (!finalCustomerName || finalCustomerName.startsWith('Member') || finalCustomerName === 'User' || finalCustomerName === 'Guest') {
       if (telegramUserId) {
         try {
           const userDoc = await db.collection('bot_users').doc(telegramUserId.toString()).get();
@@ -212,7 +216,7 @@ router.post('/create-order', async (req, res) => {
         } catch (e) {}
       }
     }
-    if (!finalCustomerName) finalCustomerName = 'Member PanzzStore';
+    if (!finalCustomerName) finalCustomerName = `Member ${config.STORE_NAME || 'Store'}`;
 
     // Saldo Payment
     if (paymentMethod === 'saldo') {
