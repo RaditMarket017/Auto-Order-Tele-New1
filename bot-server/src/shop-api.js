@@ -57,12 +57,16 @@ router.get('/store-info', async (req, res) => {
     const isMaintenance = sysDoc.exists ? Boolean(sysDoc.data()?.maintenanceMode) : Boolean(storeSettings.maintenanceMode);
     const maintenanceMessage = sysDoc.exists ? (sysDoc.data()?.maintenanceMessage || 'Toko sedang dalam pemeliharaan berkala.') : (storeSettings.maintenanceMessage || 'Toko sedang dalam pemeliharaan berkala.');
 
+    const { getGatewayConfig } = require('../../src/ramashop');
+    const gwConfig = getGatewayConfig();
+
     res.json({
       success: true,
       data: {
         ...storeSettings,
         maintenanceMode: isMaintenance,
         maintenanceMessage,
+        gateways: gwConfig,
       }
     });
   } catch (err) {
@@ -260,8 +264,10 @@ router.post('/create-order', async (req, res) => {
       return res.json({ success: true, orderId, status: 'paid' });
     }
 
-    // QRIS Payment via RamaShop
-    if (paymentMethod === 'qris') {
+    // QRIS Payment via RamaShop / PanzzPay
+    if (paymentMethod === 'qris' || paymentMethod === 'qris1' || paymentMethod === 'qris2') {
+      const preferredGw = paymentMethod === 'qris2' ? 'panzzpay' : 'ramashop';
+
       await db.collection('orders').doc(orderId).set({
         id: orderId,
         telegramUserId: telegramUserId ? telegramUserId.toString() : 'guest',
@@ -273,7 +279,7 @@ router.post('/create-order', async (req, res) => {
         quantity,
         unitPrice,
         totalPrice: total,
-        paymentMethod: 'qris',
+        paymentMethod: paymentMethod === 'qris2' ? 'qris2' : 'qris',
         deliveryType: product.deliveryType || 'instant',
         requiresEmail: Boolean(product.requiresEmail),
         status: 'pending',
@@ -283,7 +289,7 @@ router.post('/create-order', async (req, res) => {
         createdAt: new Date().toISOString(),
       });
 
-      const payResult = await createPayment(orderId, total);
+      const payResult = await createPayment(orderId, total, { gateway: preferredGw });
 
       if (!payResult || !payResult.success) {
         await db.collection('orders').doc(orderId).update({ status: 'failed' });
@@ -292,6 +298,7 @@ router.post('/create-order', async (req, res) => {
 
       await db.collection('orders').doc(orderId).update({
         ramashopDepositId: payResult.depositId,
+        gateway: payResult.gateway || preferredGw,
         uniqueAmount: payResult.totalAmount || total,
       });
 

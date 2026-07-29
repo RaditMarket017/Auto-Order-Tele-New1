@@ -1,6 +1,6 @@
 # 🚀 Auto Order Telegram Bot & Svelte 5 Mini App
 
-Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Mini App** dan **Admin Dashboard Mini App** berbasis **Svelte 5 & TailwindCSS**. Menggunakan **Firebase Firestore** untuk basis data, **RamaShop / PanzzPay QRIS** untuk pembayaran otomatis, serta fitur **Auto-Detect Domain** & **Long Polling** tanpa perlu konfigurasi Webhook manual!
+Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Mini App** dan **Admin Dashboard Mini App** berbasis **Svelte 5 & TailwindCSS**. Menggunakan **Firebase Firestore** untuk basis data, **Multi-Gateway Payment System (RamaShop & PanzzPay QRIS)** dengan fitur **Auto-Failover**, serta **Auto-Detect Domain** & **Long Polling** tanpa perlu konfigurasi Webhook manual!
 
 ---
 
@@ -11,11 +11,18 @@ Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Min
 - **Katalog & Varian Produk**: Pembelian produk digital dengan multi-varian (durasi, tipe garansi, dll).
 - **Sistem Harga Grosir (Tiering)**: Potongan harga otomatis berdasarkan jumlah kuantitas pembelian.
 - **Dukungan Email / Akun Pribadi**: Pilihan untuk produk instan (stok otomatis) maupun produk yang membutuhkan input email buyer.
-- **Pembayaran QRIS Instan & Saldo Akun**: Transaksi via QRIS instan atau potong saldo akun.
+- **Profil & Foto Telegram**: Menggunakan profil & foto asli Telegram pengguna secara otomatis di header Mini App.
+- **Pembayaran Multi-Gateway & Saldo Akun**: Transaksi via QRIS instan atau potong saldo akun.
 - **Auto Polling Status (3.5s)**: Status QRIS otomatis terdeteksi LUNAS dalam hitungan detik tanpa perlu refresh manual.
+- **Rating & Ulasan Bintang**: Fitur ulasan dan rating produk interaktif dari pengguna setelah transaksi selesai.
 - **Generator Nota Digital**: Cetak nota transaksi modern langsung dari halaman detail order.
 
-### 🖥️ 2. Admin Dashboard Mini App (Admin Frontend)
+### 💳 2. Multi-Gateway Payment System (Auto-Failover)
+- **Primary Gateway**: **RamaShop** (`https://ramashop.my.id/api/public`)
+- **Backup Gateway**: **PanzzPay** (`https://panzzpay.my.id/api/public`)
+- **Auto-Failover Uptime 99.9%**: Jika gateway utama mengalami *downtime* atau *maintenance*, bot secara otomatis mengalihkan pembuatan deposit QRIS ke gateway cadangan secara *seamless* tanpa mengganggu kenyamanan pengguna.
+
+### 🖥️ 3. Admin Dashboard Mini App (Admin Frontend)
 - **Ringkasan Analytics**: Statistik omset harian, total transaksi, total user, dan stok produk.
 - **Manajemen Produk & Varian**: Tambah, edit, ubah urutan, dan atur visibilitas produk.
 - **Upload Stok Massal (.TXT)**: Input pulsa / akun stok sekaligus dengan upload file `.txt` atau paste baris teks.
@@ -24,9 +31,10 @@ Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Min
 - **Sistem Voucher Diskon**: Buat kode voucher potongan persentase atau nominal Rupiah.
 - **Auto Auth Telegram**: Admin otomatis dikenali melalui `ADMIN_ID` Telegram tanpa perlu memasukkan password.
 
-### 🤖 3. Bot Telegram & Backend Server
+### 🤖 4. Bot Telegram & Backend Server
 - **Long Polling Mode (`bot.launch()`)**: Bot langsung jalan di PC lokal / VPS tanpa perlu daftar HTTPS Webhook Telegram.
 - **Auto-Detect Domain Server**: Express server otomatis membaca domain publik aktif (Vercel, Railway, Ngrok, VPS) tanpa perlu isi `WEBHOOK_BASE_URL` di `.env`.
+- **Fitur Garansi & Renew Akun**: Dukungan klaim garansi (`🛡️ Klaim Garansi`) dan perpanjangan akun (`🔄 Renew Akun`) otomatis untuk produk instan & invite email.
 - **Wajib Join Channel Guard**: Memastikan pengguna bergabung ke channel Telegram Anda sebelum berbelanja.
 - **Auto Clean Expired Stock**: Pembersihan stok kadaluarsa otomatis secara berkala (tiap 30 menit).
 - **Temporary Email Engine**: Layanan email sementara bawaan di dalam bot.
@@ -38,7 +46,7 @@ Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Min
 - **Node.js**: v18.0.0 atau versi lebih baru
 - **NPM**: v9.0.0 atau lebih baru
 - **Firebase Firestore Project**: Untuk penyimpanan database
-- **RamaShop API Key**: Untuk gateway pembayaran QRIS otomatis
+- **RamaShop & PanzzPay API Key**: Untuk gateway pembayaran QRIS otomatis (Auto-Failover)
 
 ---
 
@@ -65,10 +73,13 @@ BOT_TOKEN=1234567890:AAA... (Token dari @BotFather)
 ADMIN_ID=5665721422 (ID Telegram Admin dari @userinfobot)
 
 # ═══════════════════════════════════════
-# RAMASHOP PAYMENT GATEWAY
+# PAYMENT GATEWAYS (RAMASHOP & PANZZPAY)
 # ═══════════════════════════════════════
 RAMASHOP_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
 RAMASHOP_BASE_URL=https://ramashop.my.id/api/public
+
+PANZZPAY_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
+PANZZPAY_BASE_URL=https://panzzpay.my.id/api/public
 
 # ═══════════════════════════════════════
 # FIREBASE
@@ -152,7 +163,8 @@ Auto order tele new/
 ├── src/
 │   ├── config.js           # Konfigurasi aplikasi & .env
 │   ├── firebase.js         # Inisialisasi Firebase SDK
-│   ├── ramashop.js         # Integration Gateway Pembayaran RamaShop
+│   ├── ramashop.js         # Payment Gateway Manager & Auto-Failover
+│   ├── panzzpay.js         # Integration Gateway Pembayaran PanzzPay
 │   ├── fulfillment.js      # Logika pengiriman pesanan otomatis
 │   ├── stock-cleaner.js    # Pembersih stok expired
 │   └── handlers/           # Handlers pesan & perintah bot

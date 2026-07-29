@@ -5,9 +5,13 @@ module.exports = {
   BOT_TOKEN: process.env.BOT_TOKEN,
   ADMIN_ID: parseInt(process.env.ADMIN_ID),
 
-  // RamaShop Payment
+  // RamaShop Payment Gateway
   RAMASHOP_API_KEY: process.env.RAMASHOP_API_KEY,
   RAMASHOP_BASE_URL: process.env.RAMASHOP_BASE_URL || 'https://ramashop.my.id/api/public',
+
+  // PanzzPay Payment Gateway (Auto-Failover Backup)
+  PANZZPAY_API_KEY: process.env.PANZZPAY_API_KEY || process.env.RAMASHOP_API_KEY,
+  PANZZPAY_BASE_URL: process.env.PANZZPAY_BASE_URL || 'https://panzzpay.my.id/api/public',
 
   // Firebase
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,

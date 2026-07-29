@@ -35,6 +35,8 @@
 
   let tgRef = null;
 
+  let gateways = $state({ hasRamaShop: true, hasPanzzPay: false, hasDualGateways: false });
+
   onMount(async () => {
     const { id, first_name, photo_url, tg } = getTelegramUser();
     userId = id;
@@ -46,7 +48,7 @@
       const [infoRes, prodRes, userRes] = await Promise.all([
         fetchStoreInfo(),
         fetchProducts(),
-        fetchUserProfile(id),
+        id ? fetchUserProfile(id) : Promise.resolve(null),
       ]);
 
       // User profile
@@ -72,6 +74,9 @@
       if (infoRes?.success) {
         storeName = infoRes.data.storeName || 'Store';
         storeLogoUrl = infoRes.data.storeLogoUrl || '';
+        if (infoRes.data.gateways) {
+          gateways = infoRes.data.gateways;
+        }
         if (infoRes.data.maintenanceMode) {
           isMaintenanceMode = true;
           maintenanceMessage = infoRes.data.maintenanceMessage || 'Toko sedang dalam pemeliharaan.';
@@ -178,7 +183,7 @@
   </main>
 
   <!-- Checkout Sheet -->
-  <CheckoutSheet product={selectedProduct} bind:visible={checkoutVisible} {userBalance} onSubmit={handleSubmitOrder} />
+  <CheckoutSheet product={selectedProduct} bind:visible={checkoutVisible} {userBalance} {gateways} onSubmit={handleSubmitOrder} />
 
   <!-- Result Sheet -->
   <ResultSheet bind:visible={resultVisible} {orderResult} onRefresh={refreshData} />

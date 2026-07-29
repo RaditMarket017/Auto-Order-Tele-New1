@@ -98,9 +98,9 @@ async function handleBalancePayment(ctx, productId, variantIndex) {
 }
 
 /**
- * Handle payment via QRIS (RamaShop)
+ * Handle payment via QRIS (RamaShop / PanzzPay)
  */
-async function handleQRISPayment(ctx, productId, variantIndex) {
+async function handleQRISPayment(ctx, productId, variantIndex, preferredGateway = null) {
   const userId = ctx.from.id;
   const lang = await getUserLang(userId);
 
@@ -126,7 +126,7 @@ async function handleQRISPayment(ctx, productId, variantIndex) {
       quantity: cart.qty,
       unitPrice: cart.unitPrice,
       totalPrice: cart.total,
-      paymentMethod: 'qris',
+      paymentMethod: preferredGateway === 'panzzpay' ? 'qris2' : 'qris',
       deliveryType: cart.deliveryType,
       status: 'pending',
       voucherCode: cart.voucherCode || null,
@@ -135,8 +135,8 @@ async function handleQRISPayment(ctx, productId, variantIndex) {
       createdAt: new Date().toISOString(),
     });
 
-    // Create RamaShop payment
-    const payResult = await createPayment(orderId, cart.total);
+    // Create payment via requested gateway or auto-failover
+    const payResult = await createPayment(orderId, cart.total, { gateway: preferredGateway });
 
     if (!payResult || !payResult.success) {
       await db.collection('orders').doc(orderId).update({ status: 'failed' });
@@ -146,6 +146,7 @@ async function handleQRISPayment(ctx, productId, variantIndex) {
     // Save transaction ref
     await db.collection('orders').doc(orderId).update({
       ramashopDepositId: payResult.depositId,
+      gateway: payResult.gateway || preferredGateway || 'ramashop',
       uniqueAmount: payResult.totalAmount || cart.total,
     });
 

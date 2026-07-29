@@ -536,9 +536,17 @@ bot.on('callback_query', async (ctx) => {
     const parts = data.replace('pay_saldo_', '').split('_');
     return handleBalancePayment(ctx, parts[0], parseInt(parts[1]));
   }
+  if (data.startsWith('pay_qris2_')) {
+    const parts = data.replace('pay_qris2_', '').split('_');
+    return handleQRISPayment(ctx, parts[0], parseInt(parts[1]), 'panzzpay');
+  }
+  if (data.startsWith('pay_qris1_')) {
+    const parts = data.replace('pay_qris1_', '').split('_');
+    return handleQRISPayment(ctx, parts[0], parseInt(parts[1]), 'ramashop');
+  }
   if (data.startsWith('pay_qris_')) {
     const parts = data.replace('pay_qris_', '').split('_');
-    return handleQRISPayment(ctx, parts[0], parseInt(parts[1]));
+    return handleQRISPayment(ctx, parts[0], parseInt(parts[1]), 'ramashop');
   }
   if (data.startsWith('check_payment_')) {
     return checkPaymentStatus(ctx, data.replace('check_payment_', ''));

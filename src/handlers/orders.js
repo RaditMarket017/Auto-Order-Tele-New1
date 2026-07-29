@@ -87,6 +87,18 @@ async function renderOrderSummary(ctx, cart, lang, isEdit = true) {
     });
   }
 
+  const { getGatewayConfig } = require('../ramashop');
+  const gwConfig = getGatewayConfig();
+
+  const qrisRow = [];
+  if (gwConfig.hasDualGateways) {
+    qrisRow.push(Markup.button.callback('📱 QRIS 1', `pay_qris1_${cart.productId}_${cart.variantIndex}`));
+    qrisRow.push(Markup.button.callback('📱 QRIS 2', `pay_qris2_${cart.productId}_${cart.variantIndex}`));
+  } else {
+    qrisRow.push(Markup.button.callback('📱 QRIS 1', `pay_qris1_${cart.productId}_${cart.variantIndex}`));
+    qrisRow.push(Markup.button.callback('💳 Saldo', `pay_saldo_${cart.productId}_${cart.variantIndex}`));
+  }
+
   const buttons = [
     // Qty controls
     [
@@ -101,12 +113,14 @@ async function renderOrderSummary(ctx, cart, lang, isEdit = true) {
     // Voucher
     [Markup.button.callback('🎟 Pakai Voucher', 'apply_voucher')],
     // Payment
-    [
-      Markup.button.callback('💳 Saldo', `pay_saldo_${cart.productId}_${cart.variantIndex}`),
-      Markup.button.callback('📱 QRIS', `pay_qris_${cart.productId}_${cart.variantIndex}`),
-    ],
-    [Markup.button.callback(t(lang, 'btn_cancel'), `cancel_cart`)],
+    qrisRow,
   ];
+
+  if (gwConfig.hasDualGateways) {
+    buttons.push([Markup.button.callback('💳 Saldo', `pay_saldo_${cart.productId}_${cart.variantIndex}`)]);
+  }
+
+  buttons.push([Markup.button.callback(t(lang, 'btn_cancel'), `cancel_cart`)]);
 
   const keyboard = Markup.inlineKeyboard(buttons);
 
