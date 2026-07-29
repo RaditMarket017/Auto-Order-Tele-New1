@@ -7,11 +7,11 @@ module.exports = {
 
   // RamaShop Payment Gateway
   RAMASHOP_API_KEY: process.env.RAMASHOP_API_KEY,
-  RAMASHOP_BASE_URL: process.env.RAMASHOP_BASE_URL || 'https://ramashop.my.id/api/public',
+  RAMASHOP_BASE_URL: process.env.RAMASHOP_BASE_URL || 'https://ramashop.my.id',
 
   // PanzzPay Payment Gateway (Auto-Failover Backup)
   PANZZPAY_API_KEY: process.env.PANZZPAY_API_KEY || process.env.RAMASHOP_API_KEY,
-  PANZZPAY_BASE_URL: process.env.PANZZPAY_BASE_URL || 'https://panzzpay.my.id/api/public',
+  PANZZPAY_BASE_URL: process.env.PANZZPAY_BASE_URL || 'https://panzzpay.my.id',
 
   // Firebase
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,

@@ -18,8 +18,8 @@ Aplikasi **Auto Order Telegram Bot** modern yang terintegrasi dengan **Store Min
 - **Generator Nota Digital**: Cetak nota transaksi modern langsung dari halaman detail order.
 
 ### 💳 2. Multi-Gateway Payment System (Auto-Failover)
-- **Primary Gateway**: **RamaShop** (`https://ramashop.my.id/api/public`)
-- **Backup Gateway**: **PanzzPay** (`https://panzzpay.my.id/api/public`)
+- **Primary Gateway**: **RamaShop** (`https://ramashop.my.id`)
+- **Backup Gateway**: **PanzzPay** (`https://panzzpay.my.id`)
 - **Auto-Failover Uptime 99.9%**: Jika gateway utama mengalami *downtime* atau *maintenance*, bot secara otomatis mengalihkan pembuatan deposit QRIS ke gateway cadangan secara *seamless* tanpa mengganggu kenyamanan pengguna.
 
 ### 🖥️ 3. Admin Dashboard Mini App (Admin Frontend)
@@ -76,10 +76,10 @@ ADMIN_ID=5665721422 (ID Telegram Admin dari @userinfobot)
 # PAYMENT GATEWAYS (RAMASHOP & PANZZPAY)
 # ═══════════════════════════════════════
 RAMASHOP_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
-RAMASHOP_BASE_URL=https://ramashop.my.id/api/public
+RAMASHOP_BASE_URL=https://ramashop.my.id
 
 PANZZPAY_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
-PANZZPAY_BASE_URL=https://panzzpay.my.id/api/public
+PANZZPAY_BASE_URL=https://panzzpay.my.id
 
 # ═══════════════════════════════════════
 # FIREBASE
