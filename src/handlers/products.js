@@ -63,6 +63,7 @@ async function showProductList(ctx, page = 0, isEdit = false) {
     });
 
     for (let i = 0; i < pageProducts.length; i++) {
+      const p = pageProducts[i];
       const isReqEmail = Boolean(p.requiresEmail);
       const totalStock = isReqEmail
         ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
