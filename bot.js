@@ -9,7 +9,7 @@ const { Telegraf, Markup } = require('telegraf');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { db } = require('./src/firebase');
 const config = require('./src/config');
-const { formatIDR, formatDateID, delay, escapeHTML } = require('./src/helpers');
+const { formatIDR, formatDateID, delay, escapeHTML, isValidTelegramUrl } = require('./src/helpers');
 const { t } = require('./src/i18n');
 const { clearCart } = require('./src/session');
 
@@ -273,11 +273,47 @@ bot.command('menu', async (ctx) => {
 });
 
 // ═══════════════════════════════════════
-// /help
+// /help & /app
 // ═══════════════════════════════════════
 
 bot.command('help', async (ctx) => {
   await showHelpMenu(ctx);
+});
+
+bot.command(['app', 'miniapp', 'web'], async (ctx) => {
+  if (!(await checkChannelSubscription(ctx))) return;
+  const activeUrl = process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+
+  if (activeUrl && activeUrl.startsWith('https://')) {
+    // In-app Telegram WebApp popup (requires HTTPS)
+    const shopAppUrl = `${activeUrl.replace(/\/$/, '')}/app`;
+    return ctx.reply('📱 <b>Shop Mini App</b>\n\nKlik tombol di bawah untuk membuka aplikasi di dalam Telegram:', {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.webApp('🚀 Buka Shop Mini App', shopAppUrl)]
+      ])
+    });
+  } else if (activeUrl && activeUrl.startsWith('http://') && isValidTelegramUrl(activeUrl)) {
+    // External Browser Link (for HTTP / IP:Port addresses with valid domain/IP)
+    const shopAppUrl = `${activeUrl.replace(/\/$/, '')}/app`;
+    return ctx.reply('🌐 <b>Web Shop (Browser)</b>\n\n<i>Catatan: Karena URL menggunakan <b>HTTP</b> (bukan HTTPS), Telegram tidak bisa membuka popup internal. Tombol ini akan membuka web di browser:</i>', {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.url('🚀 Buka Web Shop di Browser', shopAppUrl)]
+      ])
+    });
+  } else {
+    const shopAppUrl = (activeUrl && !activeUrl.includes('localhost'))
+      ? `${activeUrl.replace(/\/$/, '')}/app`
+      : 'http://localhost:3001/app';
+    return ctx.reply(
+      '🌐 <b>Web Shop (Browser Link)</b>\n\n' +
+      'Buka link berikut di browser HP/PC Anda:\n' +
+      `<code>${shopAppUrl}</code>\n\n` +
+      '<i>*Untuk mengaktifkan tombol popup Mini App langsung di Telegram, atur <b>SERVER_URL=https://domain-kamu.com</b> di file <code>.env</code> panel Pterodactyl.</i>',
+      { parse_mode: 'HTML' }
+    );
+  }
 });
 
 // ═══════════════════════════════════════
@@ -1388,6 +1424,15 @@ async function launch() {
   console.log(`║  ${config.STORE_NAME} — Auto Order Bot`);
   console.log(`║  Modern HTML Premium Layout`);
   console.log(`╚══════════════════════════════════════╝\n`);
+
+  const activeUrl = process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+  if (!activeUrl || !activeUrl.startsWith('https://')) {
+    console.log(`⚠️  [MINI APP STATUS] SERVER_URL saat ini: "${activeUrl || 'KOSONG'}"`);
+    console.log(`⚠️  Telegram WAJIB HTTPS (cth: https://domain-kamu.com) agar Mini App bisa aktif.`);
+    console.log(`👉  Atur SERVER_URL=https://domain-kamu.com pada file .env di Panel Pterodactyl.\n`);
+  } else {
+    console.log(`📱 [MINI APP STATUS] Aktif di: ${activeUrl}/app\n`);
+  }
 
   // Start webhook server
   const app = createWebhookServer(bot);

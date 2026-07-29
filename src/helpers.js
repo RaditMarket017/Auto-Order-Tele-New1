@@ -76,6 +76,26 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Check if a URL is valid for Telegram Inline Keyboard Buttons
+ * @param {string} urlStr
+ * @returns {boolean}
+ */
+function isValidTelegramUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname;
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    if (hostname.includes('.') && !hostname.endsWith('.')) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   formatIDR,
   escapeHTML,
@@ -83,4 +103,5 @@ module.exports = {
   generateOrderId,
   formatDateID,
   delay,
+  isValidTelegramUrl,
 };

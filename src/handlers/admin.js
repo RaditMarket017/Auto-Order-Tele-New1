@@ -1,7 +1,7 @@
 const { Markup } = require('telegraf');
 const { db } = require('../firebase');
 const config = require('../config');
-const { formatIDR, escapeHTML } = require('../helpers');
+const { formatIDR, escapeHTML, isValidTelegramUrl } = require('../helpers');
 const { t } = require('../i18n');
 const ExcelJS = require('exceljs');
 
@@ -86,14 +86,16 @@ async function showAdminMenu(ctx) {
       // Direct Telegram Mini App popup button
       const webAppUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${userId}`;
       buttons.push([Markup.button.webApp('🖥️ Open Web Admin Mini App', webAppUrl)]);
-    } else if (activeUrl && !activeUrl.includes('localhost')) {
+    } else if (activeUrl && isValidTelegramUrl(activeUrl)) {
       // Real Inline URL button for Public IP / HTTP domain
       const targetUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${userId}`;
       buttons.push([Markup.button.url('🖥️ Open Web Admin Mini App', targetUrl)]);
     } else {
-      // Localhost fallback
-      const localUrl = `http://localhost:3001/admin?user_id=${userId}`;
-      extraLinkText = `\n\n🖥️ <b>Web Admin Dashboard (Browser):</b>\n<code>${localUrl}</code>`;
+      // Fallback for internal container hostnames (e.g. ramaagnnz:1086) or localhost
+      const displayUrl = (activeUrl && !activeUrl.includes('localhost'))
+        ? `${activeUrl.replace(/\/$/, '')}/admin?user_id=${userId}`
+        : `http://localhost:3001/admin?user_id=${userId}`;
+      extraLinkText = `\n\n🖥️ <b>Web Admin Dashboard (Browser):</b>\n<code>${displayUrl}</code>`;
     }
 
     buttons.push([Markup.button.callback('📢 Broadcast', 'admin_broadcast'), Markup.button.callback('📧 TMail', 'tmail_menu')]);
@@ -268,8 +270,9 @@ async function showEditProduct(ctx, productId) {
     [Markup.button.callback('📦 Upload Stok (.txt)', `admin_stock_${productId}`)],
   ];
 
-  if (config.WEBHOOK_BASE_URL && config.WEBHOOK_BASE_URL.startsWith('https://')) {
-    const webAppUrl = `${config.WEBHOOK_BASE_URL}/admin?user_id=${ctx.from.id}&secret=${config.ADMIN_SECRET}`;
+  const activeUrl = process.env.SERVER_URL || process.env.WEBHOOK_BASE_URL || config.WEBHOOK_BASE_URL;
+  if (activeUrl && activeUrl.startsWith('https://')) {
+    const webAppUrl = `${activeUrl.replace(/\/$/, '')}/admin?user_id=${ctx.from.id}&secret=${config.ADMIN_SECRET}`;
     buttons.push([Markup.button.webApp('🌐 Edit di Web App (Full Control)', webAppUrl)]);
   }
 
