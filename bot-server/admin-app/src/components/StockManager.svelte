@@ -24,7 +24,10 @@
   
   let warrantyEnabled = $state(true);
   let warrantyDays = $state(30);
-  let warrantyExpiredMessage = $state('Waktu garansi telah berakhir atau garansi hangus karena bukti tidak dikirimkan tepat waktu.');
+  let warrantyEndDateDate = $state('');
+  let warrantyExpiredMessage = $state('Mohon maaf, garansi sudah tidak berlaku.');
+  let warrantyTimeoutMessage = $state('Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.');
+  let warrantyCsMessage = $state('Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.');
 
   let submitStatus = $state('');
 
@@ -83,7 +86,10 @@
           renewNotReadyMessage,
           warrantyEnabled,
           warrantyDays,
-          warrantyExpiredMessage
+          warrantyEndDate: warrantyEndDateDate || null,
+          warrantyExpiredMessage,
+          warrantyTimeoutMessage,
+          warrantyCsMessage
         })
       });
 
@@ -260,13 +266,30 @@
 
           {#if warrantyEnabled}
             <div class="space-y-2 pt-1 border-t border-slate-800">
-              <div>
-                <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Durasi Garansi (Hari)</label>
-                <input type="number" min="0" placeholder="30" bind:value={warrantyDays} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold" />
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Durasi Garansi (Hari)</label>
+                  <input type="number" min="0" placeholder="30" bind:value={warrantyDays} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold" />
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Tanggal Akhir Garansi</label>
+                  <input type="date" bind:value={warrantyEndDateDate} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 font-medium" />
+                </div>
               </div>
+
               <div>
-                <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Teks Jika Garansi Hangus / Habis / Belum Kirim Bukti</label>
-                <textarea rows="2" bind:value={warrantyExpiredMessage} placeholder="Teks jika garansi hangus atau waktu garansi berakhir..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-200 resize-none"></textarea>
+                <label class="text-[10px] font-bold text-amber-400 block mb-0.5">1. Teks Jika Garansi Habis</label>
+                <textarea rows="1" bind:value={warrantyExpiredMessage} placeholder="Mohon maaf, garansi sudah tidak berlaku." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-200 resize-none"></textarea>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold text-rose-400 block mb-0.5">2. Teks Jika Claim Tanpa Bukti (Hangus)</label>
+                <textarea rows="1" bind:value={warrantyTimeoutMessage} placeholder="Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-200 resize-none"></textarea>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold text-sky-400 block mb-0.5">3. Pesan Kendala / CS Tambahan</label>
+                <textarea rows="1" bind:value={warrantyCsMessage} placeholder="Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-200 resize-none"></textarea>
               </div>
             </div>
           {/if}

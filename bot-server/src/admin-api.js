@@ -402,7 +402,10 @@ router.post('/stock/:productId', async (req, res) => {
         renewNotReadyMessage: renewNotReadyMessage || 'Tombol renew belum aktif saat ini.',
         warrantyEnabled: Boolean(warrantyEnabled),
         warrantyDays: Number(warrantyDays || 0),
-        warrantyExpiredMessage: warrantyExpiredMessage || 'Waktu garansi telah berakhir atau hangus karena bukti belum dikirimkan.',
+        warrantyEndDate: req.body.warrantyEndDate ? new Date(req.body.warrantyEndDate).toISOString() : null,
+        warrantyExpiredMessage: warrantyExpiredMessage || 'Mohon maaf, garansi sudah tidak berlaku.',
+        warrantyTimeoutMessage: req.body.warrantyTimeoutMessage || 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.',
+        warrantyCsMessage: req.body.warrantyCsMessage || 'Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.',
       };
 
       if (parts.length > 1) {

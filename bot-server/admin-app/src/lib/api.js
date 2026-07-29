@@ -6,8 +6,14 @@ export async function apiFetch(endpoint, options = {}) {
     ...options.headers,
     'Content-Type': 'application/json',
     'x-telegram-user-id': userId,
-    'x-admin-secret': secret
+    'x-admin-secret': secret,
+    'ngrok-skip-browser-warning': 'true'
   };
   const res = await fetch(endpoint, options);
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: false };
+  }
 }

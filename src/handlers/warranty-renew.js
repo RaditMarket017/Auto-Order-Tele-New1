@@ -39,14 +39,16 @@ function getWarrantyInfo(order) {
 
   if (alreadyClaimed) {
     const isTimeout = order.warrantyClaimStatus === 'expired_timeout';
-    const customExpiredMsg = order.warrantyExpiredMessage || 'Garansi sudah hangus karena bukti belum dikirimkan tepat waktu.';
+    const timeoutMsg = order.warrantyTimeoutMessage || 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.';
+    const customExpiredMsg = order.warrantyExpiredMessage || 'Klaim Garansi Telah Digunakan (1x)';
     return {
       hasWarranty: true,
       alreadyClaimed: true,
       isExpired: false,
       isTimeout,
-      remainingStr: isTimeout ? customExpiredMsg : 'Klaim Garansi Telah Digunakan (1x)',
+      remainingStr: isTimeout ? timeoutMsg : customExpiredMsg,
       warrantyDays,
+      csMessage: order.warrantyCsMessage || ''
     };
   }
 
@@ -59,8 +61,8 @@ function getWarrantyInfo(order) {
   }
 
   if (nowMs >= expireMs) {
-    const customExpiredMsg = order.warrantyExpiredMessage || 'Mohon maaf, waktu garansi telah berakhir atau hangus.';
-    return { hasWarranty: true, alreadyClaimed: false, isExpired: true, remainingStr: customExpiredMsg, warrantyDays };
+    const customExpiredMsg = order.warrantyExpiredMessage || 'Mohon maaf, garansi sudah tidak berlaku.';
+    return { hasWarranty: true, alreadyClaimed: false, isExpired: true, remainingStr: customExpiredMsg, warrantyDays, csMessage: order.warrantyCsMessage || '' };
   }
 
   const diffMs = expireMs - nowMs;
