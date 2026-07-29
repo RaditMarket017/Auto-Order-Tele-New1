@@ -79,7 +79,7 @@ RAMASHOP_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
 RAMASHOP_BASE_URL=https://ramashop.my.id/api/public
 
 PANZZPAY_API_KEY=rg_fe0c6171f275b7f77ebd1ed87f3f9a
-PANZZPAY_BASE_URL=https://panzzpay.my.id/api/public
+PANZZPAY_BASE_URL=https://panzzpay.my.id
 
 # ═══════════════════════════════════════
 # FIREBASE
