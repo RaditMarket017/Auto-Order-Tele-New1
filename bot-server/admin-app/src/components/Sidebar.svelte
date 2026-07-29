@@ -48,13 +48,22 @@
         Kelola Users
       </button>
 
-      <!-- Produk & Kelola Stok -->
+      <!-- Add Produk -->
       <button
         onclick={() => selectTab('products')}
         class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer {activeTab === 'products' ? 'text-white bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg shadow-violet-600/30 border border-violet-400/30' : 'text-slate-400 hover:text-white hover:bg-violet-950/40'}"
       >
         <svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-        Produk & Kelola Stok
+        📦 Add Produk
+      </button>
+
+      <!-- Add Stock -->
+      <button
+        onclick={() => selectTab('stock')}
+        class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer {activeTab === 'stock' ? 'text-white bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg shadow-emerald-600/30 border border-emerald-400/30' : 'text-slate-400 hover:text-white hover:bg-emerald-950/40'}"
+      >
+        <svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        ⚡ Add Stock
       </button>
 
       <!-- Pesanan & Reports -->

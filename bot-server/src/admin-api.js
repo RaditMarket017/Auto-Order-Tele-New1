@@ -318,7 +318,7 @@ router.delete('/products/:id', async (req, res) => {
 });
 
 // ─── STOCK POOL MANAGER (CREDENTIALS) ───
-const { cleanExpiredStock, deleteStockItem, clearStockForProduct, updateStockItemExpiredDate } = require('../../src/stock-cleaner');
+const { cleanExpiredStock, deleteStockItem, clearStockForProduct, updateStockItemExpiredDate, toggleStockItemStatus } = require('../../src/stock-cleaner');
 
 router.get('/stock/:productId', async (req, res) => {
   try {
@@ -328,7 +328,11 @@ router.get('/stock/:productId', async (req, res) => {
       .where('productId', '==', req.params.productId)
       .where('isUsed', '==', false)
       .get();
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const items = snap.docs.map(d => ({
+      id: d.id,
+      isActive: d.data().isActive !== false,
+      ...d.data()
+    }));
     res.json({ success: true, data: items, totalStock: items.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -337,7 +341,20 @@ router.get('/stock/:productId', async (req, res) => {
 
 router.post('/stock/:productId', async (req, res) => {
   try {
-    const { itemsText, variantLabel, expiredAt, expDays } = req.body;
+    const {
+      itemsText,
+      variantLabel,
+      expiredAt,
+      expDays,
+      inviteEnabled,
+      renewEnabled,
+      maxRenew,
+      renewStartDate,
+      renewNotReadyMessage,
+      warrantyEnabled,
+      warrantyDays,
+      warrantyExpiredMessage
+    } = req.body;
     if (!itemsText) return res.status(400).json({ success: false, error: 'Text stok kosong' });
 
     const prodRef = db.collection('products').doc(req.params.productId);
@@ -362,7 +379,7 @@ router.post('/stock/:productId', async (req, res) => {
 
     const poolCol = db.collection('credentials_pool');
     const batch = db.batch();
-    const isInvite = Boolean(req.body.inviteEnabled);
+    const isInvite = Boolean(inviteEnabled);
 
     lines.forEach((text, idx) => {
       const ref = poolCol.doc();
@@ -374,19 +391,38 @@ router.post('/stock/:productId', async (req, res) => {
         data: text,
         text,
         isUsed: false,
+        isActive: true,
         expiredAt: computedExpiredAt,
         addedAt: new Date().toISOString(),
-        isInviteItem: isInvite && idx === 0, // Apply invite feature to 1st item in batch if enabled
+        isInviteItem: isInvite && idx === 0,
+        inviteEnabled: Boolean(inviteEnabled),
+        renewEnabled: Boolean(renewEnabled),
+        maxRenew: Number(maxRenew || 1),
+        renewStartDate: renewStartDate || '',
+        renewNotReadyMessage: renewNotReadyMessage || 'Tombol renew belum aktif saat ini.',
+        warrantyEnabled: Boolean(warrantyEnabled),
+        warrantyDays: Number(warrantyDays || 0),
+        warrantyExpiredMessage: warrantyExpiredMessage || 'Waktu garansi telah berakhir atau hangus karena bukti belum dikirimkan.',
       };
 
       if (parts.length > 1) {
-        parsedItem.username = parts[0] || '';
-        parsedItem.password = parts[1] || '';
-        parsedItem.email = parts[2] || '';
-        parsedItem.f2aSecret = parts[3] || '';
-        parsedItem.profile = parts[4] || '';
+        // Smart Parser for user|email|password|f2a|profil|tgl_exp or user|password|email|f2a|profil|tgl_exp
+        if (parts[1] && parts[1].includes('@')) {
+          parsedItem.username = parts[0] || '';
+          parsedItem.email = parts[1] || '';
+          parsedItem.password = parts[2] || '';
+          parsedItem.f2aSecret = parts[3] || '';
+          parsedItem.profile = parts[4] || '';
+          var deleteInput = parts[5] || '';
+        } else {
+          parsedItem.username = parts[0] || '';
+          parsedItem.password = parts[1] || '';
+          parsedItem.email = parts[2] || '';
+          parsedItem.f2aSecret = parts[3] || '';
+          parsedItem.profile = parts[4] || '';
+          var deleteInput = parts[5] || '';
+        }
 
-        const deleteInput = parts[5] || '';
         if (deleteInput) {
           if (!isNaN(parseInt(deleteInput)) && !deleteInput.includes('-') && !deleteInput.includes('/')) {
             const d = new Date();
@@ -425,6 +461,18 @@ router.post('/stock/:productId', async (req, res) => {
 router.delete('/stock/item/:itemId', async (req, res) => {
   try {
     const result = await deleteStockItem(req.params.itemId);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Toggle ON / OFF active status of single stock item
+router.put('/stock/item/:itemId/toggle', async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    const result = await toggleStockItemStatus(req.params.itemId, isActive);
     if (!result.success) return res.status(400).json(result);
     res.json(result);
   } catch (err) {

@@ -13,6 +13,7 @@
 
   import ProductModal from './components/modals/ProductModal.svelte';
   import VoucherModal from './components/modals/VoucherModal.svelte';
+  import StockManager from './components/StockManager.svelte';
 
   let activeTab = $state('overview');
   let sidebarOpen = $state(false);
@@ -117,6 +118,8 @@
       <Users {users} onRefresh={loadUsers} />
     {:else if activeTab === 'products'}
       <Products {products} onOpenAddModal={openAddProductModal} onOpenEditModal={openEditProductModal} onRefresh={loadProducts} />
+    {:else if activeTab === 'stock'}
+      <StockManager {products} onRefresh={loadProducts} />
     {:else if activeTab === 'orders'}
       <Orders {orders} onRefresh={loadOrders} />
     {:else if activeTab === 'vouchers'}

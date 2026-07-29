@@ -189,10 +189,37 @@ async function updateStockItemExpiredDate(itemId, expiredAt) {
   }
 }
 
+/**
+ * Toggle active status (ON / OFF) for a single stock item
+ * @param {string} itemId
+ * @param {boolean} isActive
+ */
+async function toggleStockItemStatus(itemId, isActive = true) {
+  try {
+    const docRef = db.collection('credentials_pool').doc(itemId);
+    const doc = await docRef.get();
+    if (!doc.exists) return { success: false, error: 'Stok tidak ditemukan' };
+
+    const productId = doc.data().productId;
+    const newStatus = Boolean(isActive);
+    await docRef.update({
+      isActive: newStatus,
+      updatedAt: new Date().toISOString(),
+    });
+
+    await syncProductStock(productId);
+    return { success: true, itemId, isActive: newStatus };
+  } catch (err) {
+    console.error('toggleStockItemStatus error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   cleanExpiredStock,
   syncProductStock,
   deleteStockItem,
   clearStockForProduct,
   updateStockItemExpiredDate,
+  toggleStockItemStatus,
 };
