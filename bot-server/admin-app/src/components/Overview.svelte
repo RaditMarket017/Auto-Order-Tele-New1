@@ -17,15 +17,17 @@
     }
   }
 
-  const maxRev = $derived(() => {
-    if (!dashboardData.sales7Days || dashboardData.sales7Days.length === 0) return 1000;
-    return Math.max(...dashboardData.sales7Days.map(day => day.revenue || 0), 1000);
-  });
+  const maxRev = $derived(
+    (!dashboardData.sales7Days || dashboardData.sales7Days.length === 0)
+      ? 1000
+      : Math.max(...dashboardData.sales7Days.map(day => day.revenue || 0), 1000)
+  );
 
-  const total7 = $derived(() => {
-    if (!dashboardData.sales7Days) return 0;
-    return dashboardData.sales7Days.reduce((s, day) => s + (day.revenue || 0), 0);
-  });
+  const total7 = $derived(
+    !dashboardData.sales7Days
+      ? 0
+      : dashboardData.sales7Days.reduce((s, day) => s + (day.revenue || 0), 0)
+  );
 </script>
 
 <div class="space-y-6">
@@ -87,14 +89,14 @@
           <p class="text-[11px] text-slate-400">Grafik omset harian toko Anda dalam seminggu.</p>
         </div>
         <span class="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
-          {formatIDR(total7())}
+          {formatIDR(total7)}
         </span>
       </div>
 
       {#if dashboardData.sales7Days && dashboardData.sales7Days.length > 0}
         <div class="relative h-44 w-full pt-4 pb-2 flex items-end justify-between gap-2 border-b border-indigo-950">
           {#each dashboardData.sales7Days as day}
-            {@const heightPct = Math.max(Math.round(((day.revenue || 0) / maxRev()) * 100), 6)}
+            {@const heightPct = Math.max(Math.round(((day.revenue || 0) / maxRev) * 100), 6)}
             <div class="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
               <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-[#050711] text-white text-[10px] font-bold px-2 py-1 rounded border border-indigo-800 whitespace-nowrap shadow-xl z-20 pointer-events-none">
                 {formatIDR(day.revenue || 0)} ({day.count || 0} order)

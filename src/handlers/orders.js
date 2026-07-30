@@ -1,6 +1,6 @@
 const { Markup } = require('telegraf');
 const { db } = require('../firebase');
-const { formatIDR, escapeHTML } = require('../helpers');
+const { formatIDR, escapeHTML, stripHTMLTags } = require('../helpers');
 const { t } = require('../i18n');
 const { getProductPrice } = require('../pricing');
 const { setCart, getCart } = require('../session');
@@ -38,7 +38,7 @@ async function showOrderSummary(ctx, productId, variantIndex) {
       ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
       : poolSnap.size;
     if (availableStock <= 0) {
-      return ctx.answerCbQuery(t(lang, 'product_out_of_stock'), { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery(stripHTMLTags(t(lang, 'product_out_of_stock')), { show_alert: true }).catch(() => {});
     }
 
     const unitPrice = await getProductPrice(variant, userId);

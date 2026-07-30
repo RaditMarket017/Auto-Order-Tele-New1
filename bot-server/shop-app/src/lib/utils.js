@@ -8,6 +8,18 @@ export function escapeHTML(str) {
   return div.innerHTML;
 }
 
+export function stripHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/blockquote>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function getTelegramUser() {
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); }

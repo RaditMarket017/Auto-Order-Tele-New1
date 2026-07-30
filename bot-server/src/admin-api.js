@@ -534,8 +534,11 @@ router.post('/products/:id/update-variant-settings', async (req, res) => {
 
     const prodData = prodDoc.data();
     const targetLabel = variantLabel || prodData.variants?.[0]?.label || 'Default';
-    const scheduleDates = Array.isArray(renewScheduleDates) ? renewScheduleDates.filter(Boolean) : (renewStartDate ? [renewStartDate] : []);
+    const inputDates = Array.isArray(renewScheduleDates) ? renewScheduleDates.filter(Boolean) : [];
+    const scheduleDates = inputDates.length > 0 ? inputDates : (renewStartDate ? [renewStartDate] : []);
+    const finalRenewStartDate = renewStartDate || (scheduleDates[0] || '');
     const computedMaxRenew = scheduleDates.length > 0 ? Math.max(Number(maxRenew || 1), scheduleDates.length) : Number(maxRenew || 1);
+    const finalWarrantyEndDate = warrantyEndDate ? (warrantyEndDate.includes('T') ? warrantyEndDate : new Date(warrantyEndDate).toISOString()) : null;
 
     const updatedVariants = (prodData.variants || []).map(v => {
       if (v.label === targetLabel) {
@@ -544,12 +547,12 @@ router.post('/products/:id/update-variant-settings', async (req, res) => {
           inviteEnabled: Boolean(inviteEnabled),
           renewEnabled: Boolean(renewEnabled),
           maxRenew: computedMaxRenew,
-          renewStartDate: renewStartDate || (scheduleDates[0] || ''),
+          renewStartDate: finalRenewStartDate,
           renewScheduleDates: scheduleDates,
           renewNotReadyMessage: renewNotReadyMessage || 'Tombol renew belum aktif saat ini.',
           warrantyEnabled: Boolean(warrantyEnabled),
           warrantyDays: Number(warrantyDays || 0),
-          warrantyEndDate: warrantyEndDate ? new Date(warrantyEndDate).toISOString() : null,
+          warrantyEndDate: finalWarrantyEndDate,
           warrantyExpiredMessage: warrantyExpiredMessage || 'Mohon maaf, garansi sudah tidak berlaku.',
           warrantyTimeoutMessage: warrantyTimeoutMessage || 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.',
           warrantyCsMessage: warrantyCsMessage || 'Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.',

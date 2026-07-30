@@ -15,10 +15,17 @@ export function getAdminAuth() {
   const urlSecret = urlParams.get('secret');
 
   const tg = window.Telegram?.WebApp;
+  if (tg) {
+    try {
+      tg.ready();
+      tg.expand();
+    } catch (e) {}
+  }
+
   const tgUser = tg?.initDataUnsafe?.user;
 
   return {
-    userId: tgUser?.id || urlUserId || '5665721422',
+    userId: tgUser?.id ? String(tgUser.id) : (urlUserId ? String(urlUserId) : '5665721422'),
     secret: urlSecret || 'panzzstore2026'
   };
 }

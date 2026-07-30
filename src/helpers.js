@@ -36,6 +36,23 @@ function escapeMarkdown(text) {
 }
 
 /**
+ * Strip all HTML tags and convert formatting tags for popups/alerts
+ * @param {string} str
+ * @returns {string}
+ */
+function stripHTMLTags(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/blockquote>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
  * Generate a unique order ID with prefix
  * @param {string} prefix - e.g. 'ORD', 'TOPUP', 'RESELLER'
  * @returns {string}

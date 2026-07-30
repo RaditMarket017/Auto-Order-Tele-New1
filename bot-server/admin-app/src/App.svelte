@@ -31,6 +31,13 @@
   let voucherModalVisible = $state(false);
 
   onMount(async () => {
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      try {
+        tg.ready();
+        tg.expand();
+      } catch (e) {}
+    }
     await initDashboard();
   });
 

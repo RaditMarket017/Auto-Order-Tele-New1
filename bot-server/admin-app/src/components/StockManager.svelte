@@ -79,9 +79,16 @@
   let autoSaveTimeout = null;
   function triggerAutoSave() {
     if (isSyncingSettings || !selectedProductId) return;
+
+    if (renewScheduleDates.length > 0 && renewScheduleDates[0]) {
+      renewStartDate = renewScheduleDates[0];
+    } else if (renewStartDate && renewScheduleDates.length === 0) {
+      renewScheduleDates = [renewStartDate];
+    }
+
     clearTimeout(autoSaveTimeout);
     autoSaveTimeout = setTimeout(async () => {
-      await apiFetch(`/api/admin/products/${selectedProductId}/update-variant-settings`, {
+      const res = await apiFetch(`/api/admin/products/${selectedProductId}/update-variant-settings`, {
         method: 'POST',
         body: JSON.stringify({
           variantLabel: selectedVariantLabel,
@@ -99,7 +106,14 @@
           warrantyCsMessage
         })
       });
-    }, 500);
+
+      if (res && res.success && res.variants) {
+        const prod = products.find(p => p.id === selectedProductId);
+        if (prod) {
+          prod.variants = res.variants;
+        }
+      }
+    }, 400);
   }
 
   function openEditModal(item) {

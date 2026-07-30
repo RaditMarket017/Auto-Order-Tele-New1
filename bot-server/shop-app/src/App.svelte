@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { getTelegramUser } from './lib/utils.js';
+  import { getTelegramUser, stripHTML } from './lib/utils.js';
   import { fetchStoreInfo, fetchProducts, fetchUserProfile, createOrder } from './lib/api.js';
   import Header from './components/Header.svelte';
   import CategoryFilter from './components/CategoryFilter.svelte';
@@ -144,7 +144,7 @@
         orderResult = res;
         resultVisible = true;
       } else {
-        alert('❌ ' + (res.error || 'Gagal memproses pesanan'));
+        alert(stripHTML(res.error || 'Gagal memproses pesanan'));
       }
     } catch (err) {
       alert('❌ Gagal terhubung ke server');

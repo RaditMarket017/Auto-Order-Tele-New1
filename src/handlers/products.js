@@ -167,12 +167,27 @@ async function showProductDetail(ctx, productId) {
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
         : (stockByVariant[v.label] || 0);
       const stockBadge = vStock > 0 ? `🟢 <b>${vStock}</b>` : `🔴 <b>0 (Habis)</b>`;
-      msg += '\n' + t(lang, 'product_variant_item', {
-        label: escapeHTML(v.label),
-        price: formatIDR(price),
-        stockBadge,
-        stock: vStock,
-      });
+
+      const rawLabel = (v.label || '').trim();
+      const lines = rawLabel.split('\n').map(l => l.trim()).filter(Boolean);
+      const mainTitle = lines[0] || 'Varian';
+      const detailLines = lines.slice(1);
+
+      msg += `\n• <b>${escapeHTML(mainTitle)}</b>`;
+      if (detailLines.length > 0) {
+        detailLines.forEach(line => {
+          let formattedLine = line;
+          if (formattedLine.startsWith('📌 ') && !formattedLine.toLowerCase().includes('keterangan')) {
+            formattedLine = formattedLine.replace(/^📌\s*/, '📌 Keterangan : ');
+          } else if (/^hasil\s+give/i.test(formattedLine)) {
+            formattedLine = `📌 Keterangan : ${formattedLine}`;
+          }
+          msg += `\n  ${escapeHTML(formattedLine)}`;
+        });
+        msg += `\n  💰 Harga : <b><u>${formatIDR(price)}</u></b> | Stok: ${stockBadge}\n`;
+      } else {
+        msg += ` ➔ <b><u>${formatIDR(price)}</u></b> (Stok: ${stockBadge})`;
+      }
     }
 
     // Add wholesale tiers if configured
@@ -191,7 +206,8 @@ async function showProductDetail(ctx, productId) {
       const stock = isReqEmail
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
         : (stockByVariant[v.label] || 0);
-      const label = stock > 0 ? `🛒 ${v.label}` : `❌ ${v.label} (Habis)`;
+      const btnTitle = (v.label || '').split('\n')[0].trim();
+      const label = stock > 0 ? `🛒 ${btnTitle}` : `❌ ${btnTitle} (Habis)`;
       buttons.push([Markup.button.callback(label, stock > 0 ? `buy_${productId}_${i}` : `noop`)]);
     }
 

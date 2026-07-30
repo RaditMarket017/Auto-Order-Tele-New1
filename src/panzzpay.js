@@ -18,49 +18,65 @@ const API_KEY = process.env.PANZZPAY_API_KEY || config.PANZZPAY_API_KEY || proce
  * @returns {Promise<object>}
  */
 const createPanzzPayPayment = async (orderId, amount, options = {}) => {
-  try {
-    const response = await axios.post(`${BASE_URL}/deposit/create`, {
-      amount: Math.max(100, Math.round(amount)),
-      method: 'qris',
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-      },
-      timeout: 10000,
-    });
+  const urlList = [
+    `${BASE_URL}/deposit/create`,
+    `${BASE_URL.replace(/\/public\/?$/, '')}/deposit/create`,
+    `${BASE_URL.replace(/\/api\/public\/?$/, '')}/api/deposit/create`,
+    `${BASE_URL.replace(/\/api\/public\/?$/, '')}/deposit/create`,
+  ];
+  const uniqueUrls = [...new Set(urlList)];
 
-    const resData = response.data;
-    if (resData.success && resData.data) {
-      const d = resData.data;
-      const qrUrl = d.qrImage || (d.qrString ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(d.qrString)}` : '');
-      
-      let qrBuffer = null;
-      if (qrUrl) {
-        try {
-          const imgRes = await axios.get(qrUrl, { responseType: 'arraybuffer', timeout: 5000 });
-          qrBuffer = Buffer.from(imgRes.data);
-        } catch {}
+  let lastError;
+  for (const targetUrl of uniqueUrls) {
+    try {
+      const response = await axios.post(targetUrl, {
+        amount: Math.max(100, Math.round(amount)),
+        method: 'qris',
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': API_KEY,
+        },
+        timeout: 15000,
+      });
+
+      const resData = response.data;
+      if (resData.success && resData.data) {
+        const d = resData.data;
+        const qrUrl = d.qrImage || (d.qrString ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(d.qrString)}` : '');
+        
+        let qrBuffer = null;
+        if (qrUrl) {
+          try {
+            const imgRes = await axios.get(qrUrl, { responseType: 'arraybuffer', timeout: 7000 });
+            qrBuffer = Buffer.from(imgRes.data);
+          } catch {}
+        }
+
+        return {
+          success: true,
+          depositId: d.depositId || d.id,
+          id: d.depositId || d.id,
+          unique_amount: d.totalAmount || amount,
+          totalAmount: d.totalAmount || amount,
+          qrBuffer,
+          qr_data_url: qrUrl,
+          qrString: d.qrString,
+          status: d.status || 'pending',
+          gateway: 'panzzpay',
+        };
       }
-
-      return {
-        success: true,
-        depositId: d.depositId || d.id,
-        id: d.depositId || d.id,
-        unique_amount: d.totalAmount || amount,
-        totalAmount: d.totalAmount || amount,
-        qrBuffer,
-        qr_data_url: qrUrl,
-        qrString: d.qrString,
-        status: d.status || 'pending',
-        gateway: 'panzzpay',
-      };
+      return resData;
+    } catch (error) {
+      lastError = error;
+      if (error.response?.status === 404) {
+        continue;
+      }
+      break;
     }
-    return resData;
-  } catch (error) {
-    console.error('PanzzPay Create Error:', error.response?.data || error.message);
-    throw error;
   }
+  console.error('PanzzPay Create Error:', lastError?.response?.data || lastError?.message);
+  throw lastError || new Error('PanzzPay deposit request failed');
 };
 
 /**

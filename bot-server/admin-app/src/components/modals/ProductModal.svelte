@@ -13,6 +13,8 @@
   let variants = $state([
     {
       label: '1 Bulan',
+      duration: '',
+      keterangan: '',
       description: '',
       price: 45000,
       notes: '',
@@ -30,15 +32,36 @@
       requiresEmail = Boolean(editingProduct.requiresEmail);
       
       if (editingProduct.variants?.length) {
-        variants = editingProduct.variants.map(v => ({
-          label: v.label || '',
-          description: v.description || '',
-          price: Number(v.price || 0),
-          notes: v.notes || '',
-          wholesaleTiers: Array.isArray(v.wholesaleTiers) ? JSON.parse(JSON.stringify(v.wholesaleTiers)) : (Array.isArray(editingProduct.wholesaleTiers) ? JSON.parse(JSON.stringify(editingProduct.wholesaleTiers)) : [])
-        }));
+        variants = editingProduct.variants.map(v => {
+          let rawLabel = v.label || '';
+          const lines = rawLabel.split('\n').map(l => l.trim()).filter(Boolean);
+          const mainTitle = lines[0] || rawLabel;
+
+          let dur = v.duration || '';
+          let ket = v.keterangan || '';
+
+          if (lines.length > 1) {
+            lines.slice(1).forEach(line => {
+              if (/durasi/i.test(line)) {
+                dur = dur || line.replace(/^[⏳📌\s]*durasi\s*:\s*/i, '').trim();
+              } else if (/keterangan|hasil\s+give/i.test(line)) {
+                ket = ket || line.replace(/^[⏳📌\s]*(keterangan\s*:\s*)?/i, '').trim();
+              }
+            });
+          }
+
+          return {
+            label: mainTitle,
+            duration: dur,
+            keterangan: ket,
+            description: v.description || '',
+            price: Number(v.price || 0),
+            notes: v.notes || '',
+            wholesaleTiers: Array.isArray(v.wholesaleTiers) ? JSON.parse(JSON.stringify(v.wholesaleTiers)) : (Array.isArray(editingProduct.wholesaleTiers) ? JSON.parse(JSON.stringify(editingProduct.wholesaleTiers)) : [])
+          };
+        });
       } else {
-        variants = [{ label: '1 Bulan', description: '', price: 45000, notes: '', wholesaleTiers: [] }];
+        variants = [{ label: '1 Bulan', duration: '', keterangan: '', description: '', price: 45000, notes: '', wholesaleTiers: [] }];
       }
 
       saveStatusText = requiresEmail ? '✅ Aktif' : '❌ Off';
@@ -47,7 +70,7 @@
       imageUrl = '';
       description = '';
       requiresEmail = false;
-      variants = [{ label: '1 Bulan', description: '', price: 45000, notes: '', wholesaleTiers: [] }];
+      variants = [{ label: '1 Bulan', duration: '', keterangan: '', description: '', price: 45000, notes: '', wholesaleTiers: [] }];
       saveStatusText = '❌ Off';
     }
   });
@@ -57,6 +80,8 @@
       ...variants,
       {
         label: `Varian ${variants.length + 1}`,
+        duration: '',
+        keterangan: '',
         description: '',
         price: 10000,
         notes: '',
@@ -106,12 +131,36 @@
     if (!name.trim()) return alert('Nama Katalog tidak boleh kosong!');
     if (variants.length === 0) return alert('Minimal tambahkan 1 varian produk!');
 
-    const basePrice = variants[0]?.price || 0;
+    const formattedVariants = variants.map(v => {
+      const labelText = (v.label || '').trim().split('\n')[0];
+      const extraLines = [];
+      if (v.duration && v.duration.trim()) {
+        extraLines.push(`⏳ Durasi : ${v.duration.trim()}`);
+      }
+      if (v.keterangan && v.keterangan.trim()) {
+        let ket = v.keterangan.trim();
+        if (!ket.toLowerCase().startsWith('keterangan')) {
+          ket = `Keterangan : ${ket}`;
+        }
+        extraLines.push(`📌 ${ket}`);
+      }
+      const fullLabel = extraLines.length > 0 ? `${labelText}\n${extraLines.join('\n')}` : labelText;
+
+      return {
+        ...v,
+        label: fullLabel,
+        duration: v.duration || '',
+        keterangan: v.keterangan || '',
+        price: Number(v.price || 0)
+      };
+    });
+
+    const basePrice = formattedVariants[0]?.price || 0;
     const endpoint = editingProduct?.id ? `/api/admin/products/${editingProduct.id}` : '/api/admin/products';
     const method = editingProduct?.id ? 'PUT' : 'POST';
 
     // Collect all wholesale tiers for top level backward compatibility if needed
-    const globalWholesale = variants[0]?.wholesaleTiers || [];
+    const globalWholesale = formattedVariants[0]?.wholesaleTiers || [];
 
     const res = await apiFetch(endpoint, {
       method,
@@ -123,7 +172,7 @@
         description: description.trim(),
         requiresEmail,
         deliveryType: 'instant',
-        variants,
+        variants: formattedVariants,
         wholesaleTiers: globalWholesale
       })
     });
@@ -247,11 +296,23 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="text-[11px] font-extrabold text-slate-300 block mb-1">Nama Produk / Varian <span class="text-rose-400">*</span></label>
-                    <input type="text" bind:value={v.label} placeholder="Contoh: YT Premium 1 Bulan" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 font-bold focus:border-sky-500 focus:outline-none">
+                    <input type="text" bind:value={v.label} placeholder="Contoh: Capcut pro" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 font-bold focus:border-sky-500 focus:outline-none">
                   </div>
                   <div>
                     <label class="text-[11px] font-extrabold text-slate-300 block mb-1">Harga (Rp) <span class="text-rose-400">*</span></label>
-                    <input type="number" min="0" bind:value={v.price} placeholder="45000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-extrabold focus:border-emerald-500 focus:outline-none">
+                    <input type="number" min="0" bind:value={v.price} placeholder="1000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-extrabold focus:border-emerald-500 focus:outline-none">
+                  </div>
+                </div>
+
+                <!-- Input Durasi & Keterangan -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-[11px] font-extrabold text-amber-400 block mb-1">⏳ Durasi Varian</label>
+                    <input type="text" bind:value={v.duration} placeholder="Contoh: 30 HARI / 1 BULAN" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 font-medium focus:border-amber-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-extrabold text-sky-400 block mb-1">📌 Keterangan Varian</label>
+                    <input type="text" bind:value={v.keterangan} placeholder="Contoh: Hasil Give [ Private ]" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 font-medium focus:border-sky-500 focus:outline-none">
                   </div>
                 </div>
 

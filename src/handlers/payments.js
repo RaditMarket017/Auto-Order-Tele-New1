@@ -1,12 +1,12 @@
 const { Markup } = require('telegraf');
 const { db } = require('../firebase');
 const config = require('../config');
-const { formatIDR, generateOrderId, escapeHTML } = require('../helpers');
+const { formatIDR, generateOrderId, escapeHTML, stripHTMLTags } = require('../helpers');
 const { t } = require('../i18n');
 const { createPayment, checkStatus, cancelPayment } = require('../ramashop');
 const { getCart, clearCart } = require('../session');
 
-const stripTags = (str) => String(str || '').replace(/<[^>]*>/g, '');
+const stripTags = (str) => stripHTMLTags(str);
 
 async function getUserLang(userId) {
   try {
@@ -32,7 +32,7 @@ async function handleBalancePayment(ctx, productId, variantIndex) {
 
     if (balance < cart.total) {
       return ctx.answerCbQuery(
-        t(lang, 'payment_insufficient', { balance: formatIDR(balance), total: formatIDR(cart.total) }),
+        stripHTMLTags(t(lang, 'payment_insufficient', { balance: formatIDR(balance), total: formatIDR(cart.total) })),
         { show_alert: true }
       ).catch(() => {});
     }
@@ -186,8 +186,8 @@ async function handleQRISPayment(ctx, productId, variantIndex, preferredGateway 
     startInstantPaymentWatcher(ctx, orderId, payResult.depositId, userId);
 
   } catch (err) {
-    console.error('handleQRISPayment error:', err);
-    ctx.reply(t(lang, 'error_general'), { parse_mode: 'HTML' });
+    console.error('handleQRISPayment error:', err.message || err);
+    ctx.reply('⚠️ <b>Layanan Payment Gateway (QRIS) sedang tidak merespon / timeout.</b>\n\nSilakan coba kembali beberapa saat lagi atau pilih metode pembayaran lainnya.', { parse_mode: 'HTML' });
   }
 }
 
