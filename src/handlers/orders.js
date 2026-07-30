@@ -147,18 +147,48 @@ async function adjustQuantity(ctx, change) {
     const cart = await getCart(userId);
     if (!cart) return ctx.answerCbQuery('Tidak ada pesanan aktif.', { show_alert: true }).catch(() => {});
 
-    // Get max stock
+    // Get product & variant details
     const doc = await db.collection('products').doc(cart.productId).get();
+    if (!doc.exists) return ctx.answerCbQuery('Produk tidak ditemukan.', { show_alert: true }).catch(() => {});
+
     const product = doc.data();
     const variant = product.variants?.[cart.variantIndex];
-    const maxStock = variant?.stock || 0;
+    if (!variant) return ctx.answerCbQuery('Varian tidak ditemukan.', { show_alert: true }).catch(() => {});
+
+    // Calculate actual available stock
+    let maxStock = 0;
+    if (Boolean(product.requiresEmail)) {
+      maxStock = (variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0;
+    } else {
+      const poolSnap = await db.collection('credentials_pool')
+        .where('productId', '==', cart.productId)
+        .where('variantLabel', '==', variant.label)
+        .where('isUsed', '==', false)
+        .get();
+      maxStock = poolSnap.size;
+    }
+
+    if (maxStock <= 0) {
+      return ctx.answerCbQuery(stripHTMLTags(t(lang, 'product_out_of_stock')), { show_alert: true }).catch(() => {});
+    }
 
     let newQty = cart.qty + change;
-    if (newQty < 1) newQty = 1;
-    if (newQty > maxStock) newQty = maxStock;
+    let reachedLimit = false;
+
+    if (newQty > maxStock) {
+      newQty = maxStock;
+      reachedLimit = true;
+    }
+    if (newQty < 1) {
+      newQty = 1;
+    }
+
+    const { getProductPrice } = require('../pricing');
+    const unitPrice = await getProductPrice(variant, userId, newQty, product);
 
     cart.qty = newQty;
-    cart.total = cart.unitPrice * newQty;
+    cart.unitPrice = unitPrice;
+    cart.total = unitPrice * newQty;
 
     // Recalculate voucher if applied
     if (cart.voucherId) {
@@ -172,7 +202,12 @@ async function adjustQuantity(ctx, change) {
 
     await setCart(userId, cart);
 
-    ctx.answerCbQuery(`Qty: ${newQty}`).catch(() => {});
+    if (reachedLimit) {
+      ctx.answerCbQuery(`⚠️ Stok maksimal tersedia: ${maxStock} pcs`, { show_alert: true }).catch(() => {});
+    } else {
+      ctx.answerCbQuery(`Qty: ${newQty}`).catch(() => {});
+    }
+
     await renderOrderSummary(ctx, cart, lang, true);
   } catch (err) {
     console.error('adjustQuantity error:', err);
