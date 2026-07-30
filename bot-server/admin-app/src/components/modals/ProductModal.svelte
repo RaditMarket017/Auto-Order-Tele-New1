@@ -114,19 +114,6 @@
     variants = [...variants];
   }
 
-  async function handleEmailToggle(e) {
-    requiresEmail = e.target.checked;
-    saveStatusText = '⚡ Saving...';
-    if (editingProduct?.id) {
-      await apiFetch(`/api/admin/products/${editingProduct.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ requiresEmail })
-      });
-      onRefresh();
-    }
-    saveStatusText = requiresEmail ? '✅ Aktif (Auto-saved)' : '❌ Off (Auto-saved)';
-  }
-
   async function handleSaveProduct() {
     if (!name.trim()) return alert('Nama Katalog tidak boleh kosong!');
     if (variants.length === 0) return alert('Minimal tambahkan 1 varian produk!');
@@ -238,21 +225,6 @@
                 </div>
               {/if}
             </div>
-          </div>
-
-          <!-- Toggle Option: Invite Mode -->
-          <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl p-3">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-white">📧 Butuh Email Customer? (Invite Mode)</span>
-                <span class="text-[10px] font-bold {requiresEmail ? 'text-emerald-400' : 'text-slate-500'}">{saveStatusText}</span>
-              </div>
-              <span class="text-[10px] text-slate-400 block mt-0.5">Jika ON, pembeli akan diminta memasukkan email setelah pembayaran</span>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
-              <input type="checkbox" checked={requiresEmail} onchange={handleEmailToggle} class="sr-only peer">
-              <div class="w-10 h-5.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-sky-500"></div>
-            </label>
           </div>
         </div>
 
