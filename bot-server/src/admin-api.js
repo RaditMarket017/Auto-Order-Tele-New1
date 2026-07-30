@@ -218,23 +218,27 @@ router.post('/products', async (req, res) => {
     const computedBasePrice = basePrice || variants?.[0]?.price || 0;
     const computedStock = (variants || []).reduce((s, v) => s + Number(v.stock || 0), 0);
 
-    const sanitizedVariants = (variants || []).map(v => ({
-      label: v.label || 'Default',
-      description: v.description || '',
-      price: Number(v.price || 0),
-      stock: Number(v.stock || 0),
-      warrantyDays: Number(v.warrantyDays || 0),
-      warrantyEndDate: v.warrantyEndDate || '',
-      renewEnabled: Boolean(v.renewEnabled),
-      renewStartDate: v.renewStartDate || '',
-      maxRenew: Number(v.maxRenew || 1),
-      renewDelayDays: Number(v.renewDelayDays || 0),
-      renewNotReadyMessage: v.renewNotReadyMessage || '',
-      inviteEnabled: Boolean(v.inviteEnabled),
-      notes: v.notes || '',
-    }));
+    const sanitizedVariants = (variants || []).map(v => {
+      const scheduleDates = Array.isArray(v.renewScheduleDates) ? v.renewScheduleDates.filter(Boolean) : (v.renewStartDate ? [v.renewStartDate] : []);
+      return {
+        label: v.label || 'Default',
+        description: v.description || '',
+        price: Number(v.price || 0),
+        stock: Number(v.stock || 0),
+        warrantyDays: Number(v.warrantyDays || 0),
+        warrantyEndDate: v.warrantyEndDate || '',
+        renewEnabled: Boolean(v.renewEnabled),
+        renewStartDate: v.renewStartDate || (scheduleDates[0] || ''),
+        renewScheduleDates: scheduleDates,
+        maxRenew: scheduleDates.length > 0 ? Math.max(Number(v.maxRenew || 1), scheduleDates.length) : Number(v.maxRenew || 1),
+        renewDelayDays: Number(v.renewDelayDays || 0),
+        renewNotReadyMessage: v.renewNotReadyMessage || '',
+        inviteEnabled: Boolean(v.inviteEnabled),
+        notes: v.notes || '',
+      };
+    });
     if (sanitizedVariants.length === 0) {
-      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
+      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', renewScheduleDates: [], maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
     }
 
     const docRef = await db.collection('products').add({
@@ -266,23 +270,27 @@ router.put('/products/:id', async (req, res) => {
     const computedBasePrice = basePrice || variants?.[0]?.price || 0;
     const computedStock = (variants || []).reduce((s, v) => s + Number(v.stock || 0), 0);
 
-    const sanitizedVariants = (variants || []).map(v => ({
-      label: v.label || 'Default',
-      description: v.description || '',
-      price: Number(v.price || 0),
-      stock: Number(v.stock || 0),
-      warrantyDays: Number(v.warrantyDays || 0),
-      warrantyEndDate: v.warrantyEndDate || '',
-      renewEnabled: Boolean(v.renewEnabled),
-      renewStartDate: v.renewStartDate || '',
-      maxRenew: Number(v.maxRenew || 1),
-      renewDelayDays: Number(v.renewDelayDays || 0),
-      renewNotReadyMessage: v.renewNotReadyMessage || '',
-      inviteEnabled: Boolean(v.inviteEnabled),
-      notes: v.notes || '',
-    }));
+    const sanitizedVariants = (variants || []).map(v => {
+      const scheduleDates = Array.isArray(v.renewScheduleDates) ? v.renewScheduleDates.filter(Boolean) : (v.renewStartDate ? [v.renewStartDate] : []);
+      return {
+        label: v.label || 'Default',
+        description: v.description || '',
+        price: Number(v.price || 0),
+        stock: Number(v.stock || 0),
+        warrantyDays: Number(v.warrantyDays || 0),
+        warrantyEndDate: v.warrantyEndDate || '',
+        renewEnabled: Boolean(v.renewEnabled),
+        renewStartDate: v.renewStartDate || (scheduleDates[0] || ''),
+        renewScheduleDates: scheduleDates,
+        maxRenew: scheduleDates.length > 0 ? Math.max(Number(v.maxRenew || 1), scheduleDates.length) : Number(v.maxRenew || 1),
+        renewDelayDays: Number(v.renewDelayDays || 0),
+        renewNotReadyMessage: v.renewNotReadyMessage || '',
+        inviteEnabled: Boolean(v.inviteEnabled),
+        notes: v.notes || '',
+      };
+    });
     if (sanitizedVariants.length === 0) {
-      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
+      sanitizedVariants.push({ label: 'Default', description: '', price: computedBasePrice, stock: 0, warrantyDays: 0, warrantyEndDate: '', renewEnabled: false, renewStartDate: '', renewScheduleDates: [], maxRenew: 1, renewDelayDays: 0, renewNotReadyMessage: '', inviteEnabled: false, notes: '' });
     }
 
     const updateData = {
@@ -381,6 +389,9 @@ router.post('/stock/:productId', async (req, res) => {
     const batch = db.batch();
     const isInvite = Boolean(inviteEnabled);
 
+    const scheduleDates = Array.isArray(req.body.renewScheduleDates) ? req.body.renewScheduleDates.filter(Boolean) : (renewStartDate ? [renewStartDate] : []);
+    const computedMaxRenew = scheduleDates.length > 0 ? Math.max(Number(maxRenew || 1), scheduleDates.length) : Number(maxRenew || 1);
+
     lines.forEach((text, idx) => {
       const ref = poolCol.doc();
       const parts = text.split('|').map(p => p.trim());
@@ -397,8 +408,9 @@ router.post('/stock/:productId', async (req, res) => {
         isInviteItem: isInvite && idx === 0,
         inviteEnabled: Boolean(inviteEnabled),
         renewEnabled: Boolean(renewEnabled),
-        maxRenew: Number(maxRenew || 1),
-        renewStartDate: renewStartDate || '',
+        maxRenew: computedMaxRenew,
+        renewStartDate: renewStartDate || (scheduleDates[0] || ''),
+        renewScheduleDates: scheduleDates,
         renewNotReadyMessage: renewNotReadyMessage || 'Tombol renew belum aktif saat ini.',
         warrantyEnabled: Boolean(warrantyEnabled),
         warrantyDays: Number(warrantyDays || 0),

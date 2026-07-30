@@ -77,6 +77,18 @@ function drawSeparator(ctx, x, y, w) {
   ctx.fillRect(x, y, w, 1);
 }
 
+function hexToRgba(hex, alpha = 1) {
+  if (!hex || typeof hex !== 'string') return `rgba(0, 150, 255, ${alpha})`;
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length !== 6) return `rgba(0, 150, 255, ${alpha})`;
+  const num = parseInt(c, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /**
  * Generate nota order PNG — Ultra Premium Dark Glassmorphism
  */
@@ -89,19 +101,23 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
   const pad = 40; // main horizontal padding
   const cardW = width - pad * 2;
 
+  const bgColor = storeSettings.notaBgColor || '#071428';
+  const accentColor = storeSettings.notaAccentColor || '#0077ff';
+  const accentRgba = hexToRgba(accentColor, 0.5);
+
   // ═══════════════════════════════════════════════════════════
-  // BACKGROUND: Deep space gradient + subtle grid texture
+  // BACKGROUND: Custom gradient + subtle grid texture
   // ═══════════════════════════════════════════════════════════
   const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
   bgGrad.addColorStop(0, '#030a18');
-  bgGrad.addColorStop(0.3, '#071428');
-  bgGrad.addColorStop(0.7, '#0a1830');
+  bgGrad.addColorStop(0.3, bgColor);
+  bgGrad.addColorStop(0.7, bgColor);
   bgGrad.addColorStop(1, '#040c1a');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
   // Subtle grid pattern
-  ctx.strokeStyle = 'rgba(30, 70, 140, 0.06)';
+  ctx.strokeStyle = hexToRgba(accentColor, 0.06);
   ctx.lineWidth = 1;
   for (let gx = 0; gx < width; gx += 35) {
     ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, height); ctx.stroke();
@@ -129,13 +145,13 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
   // ═══════════════════════════════════════════════════════════
   // Outer glow
   roundRect(ctx, 12, 12, width - 24, height - 24, 22);
-  ctx.strokeStyle = 'rgba(0, 120, 255, 0.5)';
+  ctx.strokeStyle = accentRgba;
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
   // Inner frame
   roundRect(ctx, 16, 16, width - 32, height - 32, 18);
-  ctx.strokeStyle = 'rgba(0, 200, 255, 0.15)';
+  ctx.strokeStyle = hexToRgba(accentColor, 0.15);
   ctx.lineWidth = 1;
   ctx.stroke();
 
@@ -144,7 +160,7 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
   corners.forEach(([cx, cy]) => {
     ctx.beginPath();
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#00aaff';
+    ctx.fillStyle = accentColor;
     ctx.fill();
   });
 
@@ -153,7 +169,31 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
   // ═══════════════════════════════════════════════════════════
   // HEADER: Store Name + Nota Order Badge
   // ═══════════════════════════════════════════════════════════
-  const storeName = storeSettings.storeName || 'RADIT MARKET';
+  const storeName = storeSettings.notaStoreName || storeSettings.storeName || 'STORE NAME';
+  const logoUrl = storeSettings.notaLogoUrl || storeSettings.storeLogoUrl || '';
+
+  // Render Store Logo if available
+  if (logoUrl) {
+    try {
+      const logoImg = await loadImage(logoUrl);
+      const logoSize = 56;
+      const logoX = (width - logoSize) / 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(logoX + logoSize / 2, yPos + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(logoImg, logoX, yPos, logoSize, logoSize);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(logoX + logoSize / 2, yPos + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      yPos += logoSize + 10;
+    } catch (e) {}
+  }
 
   // Decorative top line
   drawSeparator(ctx, pad + 30, yPos, cardW - 60);
@@ -161,9 +201,9 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
 
   // Store Name
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 32px Arial, sans-serif';
+  ctx.font = 'bold 30px Arial, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(storeName.toUpperCase(), width / 2, yPos + 28);
+  ctx.fillText(storeName.toUpperCase(), width / 2, yPos + 26);
 
   // Glow under text
   const nameGlow = ctx.createRadialGradient(width / 2, yPos + 20, 10, width / 2, yPos + 20, 150);

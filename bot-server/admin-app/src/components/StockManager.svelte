@@ -20,7 +20,23 @@
   let renewEnabled = $state(false);
   let maxRenew = $state(1);
   let renewStartDate = $state('');
+  let renewScheduleDates = $state([]);
   let renewNotReadyMessage = $state('Tombol renew belum aktif saat ini. Silakan coba kembali sesuai tanggal yang ditentukan.');
+
+  function addRenewTier() {
+    if (renewScheduleDates.length === 0) {
+      const firstDate = renewStartDate || new Date().toISOString().substring(0, 10);
+      renewScheduleDates = [firstDate, new Date().toISOString().substring(0, 10)];
+    } else {
+      renewScheduleDates = [...renewScheduleDates, new Date().toISOString().substring(0, 10)];
+    }
+    maxRenew = renewScheduleDates.length;
+  }
+
+  function removeRenewTier(idx) {
+    renewScheduleDates = renewScheduleDates.filter((_, i) => i !== idx);
+    maxRenew = Math.max(1, renewScheduleDates.length);
+  }
   
   let warrantyEnabled = $state(true);
   let warrantyDays = $state(30);
@@ -81,8 +97,9 @@
           expDays: expDays || null,
           inviteEnabled,
           renewEnabled,
-          maxRenew,
-          renewStartDate,
+          maxRenew: renewScheduleDates.length > 0 ? renewScheduleDates.length : maxRenew,
+          renewStartDate: renewStartDate || (renewScheduleDates[0] || ''),
+          renewScheduleDates: renewScheduleDates.filter(Boolean),
           renewNotReadyMessage,
           warrantyEnabled,
           warrantyDays,
@@ -185,9 +202,9 @@
         {#if selectedProduct && selectedProduct.variants?.length > 0}
           <div>
             <label class="text-[11px] font-extrabold text-slate-400 block mb-1">
-              Target Varian {#if inviteEnabled}<span class="text-emerald-400">(Fitur Invite ON: Varian Opsional)</span>{/if}
+              Target Varian {#if inviteEnabled}<span class="text-emerald-400">(Fitur Invite ON)</span>{/if}
             </label>
-            <select bind:value={selectedVariantLabel} disabled={inviteEnabled} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-sky-400 font-extrabold focus:border-sky-500 focus:outline-none disabled:opacity-50">
+            <select bind:value={selectedVariantLabel} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-sky-400 font-extrabold focus:border-sky-500 focus:outline-none">
               {#each selectedProduct.variants as v}
                 <option value={v.label}>Varian: {v.label}</option>
               {/each}
@@ -215,7 +232,7 @@
           </div>
           {#if inviteEnabled}
             <p class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
-              ✓ Invite ON: Pembeli tidak perlu memilih varian. Stok ini otomatis diprioritaskan sebagai akun invite!
+              ✓ Invite ON: Fitur invite aktif untuk varian yang dipilih. Stok ini otomatis diprioritaskan sebagai akun invite!
             </p>
           {/if}
         </div>
@@ -233,17 +250,50 @@
           </div>
 
           {#if renewEnabled}
-            <div class="space-y-2 pt-1 border-t border-slate-800">
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Max Renew (Kali)</label>
-                  <input type="number" min="1" placeholder="1" bind:value={maxRenew} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold" />
-                </div>
-                <div>
-                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Tanggal Aktif Renew</label>
-                  <input type="date" bind:value={renewStartDate} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 font-medium" />
-                </div>
+            <div class="space-y-2.5 pt-1 border-t border-slate-800">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold text-indigo-400">
+                  📅 Jadwal Tanggal Renew ({renewScheduleDates.length > 0 ? renewScheduleDates.length : 1} Tier = {renewScheduleDates.length > 0 ? renewScheduleDates.length : maxRenew}x Renew)
+                </span>
+                <button
+                  type="button"
+                  onclick={addRenewTier}
+                  class="px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-lg text-[10px] font-extrabold cursor-pointer transition-all flex items-center gap-1"
+                >
+                  + Tambah Tier Renew
+                </button>
               </div>
+
+              {#if renewScheduleDates.length === 0}
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Max Renew (Kali)</label>
+                    <input type="number" min="1" placeholder="1" bind:value={maxRenew} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Tanggal Aktif Renew (Tier 1)</label>
+                    <input type="date" bind:value={renewStartDate} class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 font-medium" />
+                  </div>
+                </div>
+              {:else}
+                <div class="space-y-1.5 bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
+                  {#each renewScheduleDates as tDate, tIdx}
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] font-extrabold text-slate-300 w-24">Tier #{tIdx + 1} (Renew {tIdx + 1}):</span>
+                      <input type="date" bind:value={renewScheduleDates[tIdx]} class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-indigo-300 font-bold focus:border-indigo-500 focus:outline-none" />
+                      {#if renewScheduleDates.length > 1}
+                        <button
+                          type="button"
+                          onclick={() => removeRenewTier(tIdx)}
+                          class="px-2 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                          title="Hapus Tier"
+                        >✕</button>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
               <div>
                 <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Teks Jika Renew Belum Berfungsi</label>
                 <textarea rows="2" bind:value={renewNotReadyMessage} placeholder="Teks pemberitahuan jika renew belum berfungsi..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-200 resize-none"></textarea>

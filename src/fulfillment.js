@@ -101,6 +101,9 @@ async function fulfillOrder(orderId) {
       let maxRenew = Number(order.maxRenew || 1);
       let renewDelayDays = Number(order.renewDelayDays || 0);
 
+      let renewScheduleDates = Array.isArray(order.renewScheduleDates) ? order.renewScheduleDates : (order.renewStartDate ? [order.renewStartDate] : []);
+      let renewStartDate = order.renewStartDate || '';
+
       // Decrement manual variant stock if set
       if (order.productId) {
         try {
@@ -116,6 +119,10 @@ async function fulfillOrder(orderId) {
               if (variant.renewEnabled !== undefined) renewEnabled = Boolean(variant.renewEnabled);
               if (variant.maxRenew !== undefined) maxRenew = Number(variant.maxRenew || 1);
               if (variant.renewDelayDays !== undefined) renewDelayDays = Number(variant.renewDelayDays || 0);
+              if (variant.renewStartDate) renewStartDate = variant.renewStartDate;
+              if (Array.isArray(variant.renewScheduleDates) && variant.renewScheduleDates.length > 0) {
+                renewScheduleDates = variant.renewScheduleDates;
+              }
               if (variant.stock > 0) {
                 variants[vIdx].stock = Math.max(0, variants[vIdx].stock - (order.quantity || 1));
                 await pRef.update({ variants, updatedAt: new Date().toISOString() });
@@ -133,8 +140,10 @@ async function fulfillOrder(orderId) {
         inviteStatus: 'waiting_email_input',
         warrantyDays,
         renewEnabled,
-        maxRenew,
+        maxRenew: renewScheduleDates.length > 0 ? Math.max(maxRenew, renewScheduleDates.length) : maxRenew,
         renewDelayDays,
+        renewStartDate,
+        renewScheduleDates,
         updatedAt: new Date().toISOString(),
       });
 
@@ -226,7 +235,6 @@ async function fulfillOrder(orderId) {
 /**
  * Helper to format credential item
  */
-function formatCredentialItem(credText, index) {
 function formatCredentialItem(credItem, index) {
   if (!credItem) return `<b><u>AKUN #${index + 1}</u></b>\n-`;
 
@@ -318,9 +326,16 @@ async function autoFulfill(orderId, order, orderRef) {
 
     let variantNotes = '';
     let warrantyDays = Number(order.warrantyDays || 0);
-    let renewEnabled = Boolean(order.renewEnabled);
-    let maxRenew = Number(order.maxRenew || 1);
-    let renewDelayDays = Number(order.renewDelayDays || 0);
+    let renewScheduleDates = Array.isArray(order.renewScheduleDates) ? order.renewScheduleDates : (order.renewStartDate ? [order.renewStartDate] : []);
+    let renewStartDate = order.renewStartDate || '';
+
+    const firstCred = credentials[0];
+    if (firstCred) {
+      if (Array.isArray(firstCred.renewScheduleDates) && firstCred.renewScheduleDates.length > 0) {
+        renewScheduleDates = firstCred.renewScheduleDates;
+      }
+      if (firstCred.renewStartDate) renewStartDate = firstCred.renewStartDate;
+    }
 
     if (order.productId) {
       try {
@@ -333,12 +348,17 @@ async function autoFulfill(orderId, order, orderRef) {
             if (variant.renewEnabled !== undefined) renewEnabled = Boolean(variant.renewEnabled);
             if (variant.maxRenew !== undefined) maxRenew = Number(variant.maxRenew || 1);
             if (variant.renewDelayDays !== undefined) renewDelayDays = Number(variant.renewDelayDays || 0);
+            if (variant.renewStartDate && !renewStartDate) renewStartDate = variant.renewStartDate;
+            if (Array.isArray(variant.renewScheduleDates) && variant.renewScheduleDates.length > 0 && renewScheduleDates.length === 0) {
+              renewScheduleDates = variant.renewScheduleDates;
+            }
             if (variant.notes) variantNotes = variant.notes.trim();
           }
         }
       } catch (e) {}
     }
 
+    const effectiveMaxRenew = renewScheduleDates.length > 0 ? Math.max(maxRenew, renewScheduleDates.length) : maxRenew;
     const deliveredAt = new Date().toISOString();
 
     await orderRef.update({
@@ -347,8 +367,10 @@ async function autoFulfill(orderId, order, orderRef) {
       deliveredAt,
       warrantyDays,
       renewEnabled,
-      maxRenew,
+      maxRenew: effectiveMaxRenew,
       renewDelayDays,
+      renewStartDate,
+      renewScheduleDates,
       renewCount: order.renewCount || 0,
     });
 
@@ -359,8 +381,10 @@ async function autoFulfill(orderId, order, orderRef) {
       deliveredAt,
       warrantyDays,
       renewEnabled,
-      maxRenew,
+      maxRenew: effectiveMaxRenew,
       renewDelayDays,
+      renewStartDate,
+      renewScheduleDates,
       renewCount: order.renewCount || 0,
     };
 

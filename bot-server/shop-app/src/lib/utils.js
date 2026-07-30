@@ -15,6 +15,7 @@ export function getTelegramUser() {
   const urlParams = new URLSearchParams(window.location.search);
   const tgUser = tg?.initDataUnsafe?.user;
   const urlUserId = urlParams.get('user_id');
+  const urlName = urlParams.get('name') || urlParams.get('first_name') || urlParams.get('username');
   const urlPhoto = urlParams.get('photo_url') || urlParams.get('photo');
 
   let name = '';

@@ -107,14 +107,27 @@ function getRenewInfo(order) {
 
   const nowMs = Date.now();
   let nextAvailableMs = 0;
+  let targetDateStr = '';
 
-  if (order.renewStartDate) {
-    nextAvailableMs = new Date(order.renewStartDate).getTime();
-  } else {
+  const scheduleDates = Array.isArray(order.renewScheduleDates) && order.renewScheduleDates.length > 0
+    ? order.renewScheduleDates
+    : (order.renewStartDate ? [order.renewStartDate] : []);
+
+  if (scheduleDates.length > 0) {
+    const rawDateStr = scheduleDates[renewCount] !== undefined ? scheduleDates[renewCount] : scheduleDates[scheduleDates.length - 1];
+    if (rawDateStr) {
+      targetDateStr = rawDateStr;
+      nextAvailableMs = new Date(rawDateStr).getTime();
+    }
+  }
+
+  if (!nextAvailableMs) {
     const renewDelayDays = Number(order.renewDelayDays || 0);
     const startMs = order.deliveredAt ? new Date(order.deliveredAt).getTime() : new Date(order.createdAt || Date.now()).getTime();
     nextAvailableMs = startMs + ((renewCount + 1) * renewDelayDays * 86400 * 1000);
   }
+
+  const effectiveMaxRenew = scheduleDates.length > 0 ? Math.max(maxRenew, scheduleDates.length) : maxRenew;
 
   if (nowMs >= nextAvailableMs || !nextAvailableMs) {
     return {
@@ -122,7 +135,7 @@ function getRenewInfo(order) {
       isMaxReached: false,
       isReady: true,
       renewCount,
-      maxRenew,
+      maxRenew: effectiveMaxRenew,
     };
   }
 
@@ -141,9 +154,10 @@ function getRenewInfo(order) {
     isMaxReached: false,
     isReady: false,
     nextAvailableMs,
+    targetDateStr,
     waitStr: waitStr.trim(),
     renewCount,
-    maxRenew,
+    maxRenew: effectiveMaxRenew,
     customNotReadyMessage: order.renewNotReadyMessage || '',
   };
 }
@@ -316,11 +330,30 @@ function registerWarrantyRenewHandlers(bot) {
       }
 
       if (!renewInfo.isReady) {
-        const notReadyText = renewInfo.customNotReadyMessage ||
-          `⏳ <b>RENEW BELUM TERSEDIA</b>\n` +
-          `────────────────────────────\n` +
-          `• <b>Status</b>: Silakan tunggu <b>${renewInfo.waitStr}</b> lagi.\n` +
-          `• <b>Renew Ke</b>: <b>${renewInfo.renewCount + 1} dari ${renewInfo.maxRenew}x</b>`;
+        let notReadyText = renewInfo.customNotReadyMessage;
+        let formattedDate = '';
+        if (renewInfo.targetDateStr) {
+          const d = new Date(renewInfo.targetDateStr);
+          if (!isNaN(d.getTime())) {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            formattedDate = `${day}/${month}/${d.getFullYear()}`;
+          }
+        }
+
+        if (notReadyText) {
+          if (formattedDate) {
+            notReadyText += `\n\n📅 <b>Jadwal Aktif Renew Ke-${renewInfo.renewCount + 1}</b>: <code>${formattedDate}</code>`;
+          }
+        } else {
+          notReadyText =
+            `⏳ <b>RENEW BELUM TERSEDIA</b>\n` +
+            `────────────────────────────\n` +
+            (formattedDate ? `• <b>Jadwal Aktif</b>: <code>${formattedDate}</code>\n` : '') +
+            `• <b>Sisa Waktu</b> : Silakan tunggu <b>${renewInfo.waitStr}</b> lagi.\n` +
+            `• <b>Renew Ke</b>   : <b>${renewInfo.renewCount + 1} dari ${renewInfo.maxRenew}x</b>`;
+        }
+
         return safeEditMessage(ctx,
           `${notReadyText}\n\n💬 <i>Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.</i>`
         );
