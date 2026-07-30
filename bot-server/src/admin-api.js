@@ -472,6 +472,99 @@ router.post('/stock/:productId', async (req, res) => {
   }
 });
 
+// Edit single stock item
+router.put('/stock/item/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const body = req.body;
+    const itemRef = db.collection('credentials_pool').doc(itemId);
+    const itemDoc = await itemRef.get();
+    if (!itemDoc.exists) return res.status(404).json({ success: false, error: 'Stok tidak ditemukan' });
+
+    const itemData = itemDoc.data();
+    const updateData = {};
+    if (body.username !== undefined) updateData.username = body.username;
+    if (body.password !== undefined) updateData.password = body.password;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.f2aSecret !== undefined) updateData.f2aSecret = body.f2aSecret;
+    if (body.profile !== undefined) updateData.profile = body.profile;
+    if (body.expiredAt !== undefined) updateData.expiredAt = body.expiredAt ? new Date(body.expiredAt).toISOString() : null;
+
+    if (body.isInviteItem !== undefined) updateData.isInviteItem = Boolean(body.isInviteItem);
+    if (body.inviteEnabled !== undefined) updateData.inviteEnabled = Boolean(body.inviteEnabled);
+    if (body.renewEnabled !== undefined) updateData.renewEnabled = Boolean(body.renewEnabled);
+    if (body.maxRenew !== undefined) updateData.maxRenew = Number(body.maxRenew || 1);
+    if (body.renewStartDate !== undefined) updateData.renewStartDate = body.renewStartDate || '';
+    if (Array.isArray(body.renewScheduleDates)) updateData.renewScheduleDates = body.renewScheduleDates.filter(Boolean);
+    if (body.renewNotReadyMessage !== undefined) updateData.renewNotReadyMessage = body.renewNotReadyMessage;
+
+    if (body.warrantyEnabled !== undefined) updateData.warrantyEnabled = Boolean(body.warrantyEnabled);
+    if (body.warrantyDays !== undefined) updateData.warrantyDays = Number(body.warrantyDays || 0);
+    if (body.warrantyEndDate !== undefined) updateData.warrantyEndDate = body.warrantyEndDate ? new Date(body.warrantyEndDate).toISOString() : null;
+    if (body.warrantyExpiredMessage !== undefined) updateData.warrantyExpiredMessage = body.warrantyExpiredMessage;
+    if (body.warrantyTimeoutMessage !== undefined) updateData.warrantyTimeoutMessage = body.warrantyTimeoutMessage;
+    if (body.warrantyCsMessage !== undefined) updateData.warrantyCsMessage = body.warrantyCsMessage;
+
+    // Update raw data format text
+    const parts = [
+      updateData.username !== undefined ? updateData.username : (itemData.username || ''),
+      updateData.email !== undefined ? updateData.email : (itemData.email || ''),
+      updateData.password !== undefined ? updateData.password : (itemData.password || ''),
+      updateData.f2aSecret !== undefined ? updateData.f2aSecret : (itemData.f2aSecret || ''),
+      updateData.profile !== undefined ? updateData.profile : (itemData.profile || ''),
+    ].filter(Boolean);
+
+    updateData.data = parts.length > 0 ? parts.join(' | ') : (itemData.data || '');
+    updateData.text = updateData.data;
+
+    await itemRef.update(updateData);
+    res.json({ success: true, message: 'Data stok berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Auto-save product variant feature settings
+router.post('/products/:id/update-variant-settings', async (req, res) => {
+  try {
+    const { variantLabel, inviteEnabled, renewEnabled, maxRenew, renewStartDate, renewScheduleDates, renewNotReadyMessage, warrantyEnabled, warrantyDays, warrantyEndDate, warrantyExpiredMessage, warrantyTimeoutMessage, warrantyCsMessage } = req.body;
+    const prodRef = db.collection('products').doc(req.params.id);
+    const prodDoc = await prodRef.get();
+    if (!prodDoc.exists) return res.status(404).json({ success: false, error: 'Produk tidak ditemukan' });
+
+    const prodData = prodDoc.data();
+    const targetLabel = variantLabel || prodData.variants?.[0]?.label || 'Default';
+    const scheduleDates = Array.isArray(renewScheduleDates) ? renewScheduleDates.filter(Boolean) : (renewStartDate ? [renewStartDate] : []);
+    const computedMaxRenew = scheduleDates.length > 0 ? Math.max(Number(maxRenew || 1), scheduleDates.length) : Number(maxRenew || 1);
+
+    const updatedVariants = (prodData.variants || []).map(v => {
+      if (v.label === targetLabel) {
+        return {
+          ...v,
+          inviteEnabled: Boolean(inviteEnabled),
+          renewEnabled: Boolean(renewEnabled),
+          maxRenew: computedMaxRenew,
+          renewStartDate: renewStartDate || (scheduleDates[0] || ''),
+          renewScheduleDates: scheduleDates,
+          renewNotReadyMessage: renewNotReadyMessage || 'Tombol renew belum aktif saat ini.',
+          warrantyEnabled: Boolean(warrantyEnabled),
+          warrantyDays: Number(warrantyDays || 0),
+          warrantyEndDate: warrantyEndDate ? new Date(warrantyEndDate).toISOString() : null,
+          warrantyExpiredMessage: warrantyExpiredMessage || 'Mohon maaf, garansi sudah tidak berlaku.',
+          warrantyTimeoutMessage: warrantyTimeoutMessage || 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.',
+          warrantyCsMessage: warrantyCsMessage || 'Jika ada kendala, silakan hubungi CS kami untuk bantuan lebih lanjut.',
+        };
+      }
+      return v;
+    });
+
+    await prodRef.update({ variants: updatedVariants });
+    res.json({ success: true, variants: updatedVariants });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Delete single stock item
 router.delete('/stock/item/:itemId', async (req, res) => {
   try {
