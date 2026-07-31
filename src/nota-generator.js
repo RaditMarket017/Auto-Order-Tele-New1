@@ -302,7 +302,10 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
   // ═══════════════════════════════════════════════════════════
   // CARD 2: Product & Customer Details
   // ═══════════════════════════════════════════════════════════
-  const card2H = 240;
+  // ═══════════════════════════════════════════════════════════
+  // CARD 2: Product & Customer Details
+  // ═══════════════════════════════════════════════════════════
+  const card2H = 265;
   drawGlassCard(ctx, pad, yPos, cardW, card2H);
 
   // Card title bar
@@ -398,17 +401,36 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
 
   // ── Right Side: Detail Rows ──
   const detailX = logoX + logoSize + 22;
+
+  const rawVariantLabel = orderData.variantLabel || '-';
+  const labelLines = rawVariantLabel.split('\n').map(l => l.trim()).filter(Boolean);
+  const varianName = labelLines[0] || rawVariantLabel;
+
+  let parsedDurasi = orderData.duration || '-';
+  let parsedKeterangan = orderData.keterangan || '-';
+
+  if (labelLines.length > 1) {
+    labelLines.slice(1).forEach(line => {
+      if (/durasi/i.test(line)) {
+        parsedDurasi = line.replace(/^[⏳📌\s]*durasi\s*:\s*/i, '').trim();
+      } else if (/keterangan|hasil\s+give/i.test(line)) {
+        parsedKeterangan = line.replace(/^[⏳📌\s]*(keterangan\s*:\s*)?/i, '').trim();
+      }
+    });
+  }
+
   const prodRows = [
     ['Nama User', orderData.customerName || 'User'],
     ['Produk', orderData.productName || '-'],
-    ['Keterangan', orderData.variantLabel || '-'],
-    ['Durasi', orderData.duration || orderData.variantLabel || '-'],
+    ['Varian', varianName],
+    ['Durasi', parsedDurasi],
+    ['Keterangan', parsedKeterangan],
     ['Qty', String(orderData.quantity || 1)],
     ['Harga Satuan', formatCurrency(orderData.unitPrice || orderData.totalPrice)],
     ['Subtotal', formatCurrency(orderData.totalPrice)],
   ];
 
-  let pdY = yPos + 50;
+  let pdY = yPos + 44;
   ctx.textAlign = 'left';
   prodRows.forEach(([label, val], i) => {
     const isLast = i === prodRows.length - 1;
@@ -417,12 +439,18 @@ async function generateNotaPNG(orderData, storeSettings = {}) {
     ctx.fillText(label, detailX, pdY);
 
     ctx.fillStyle = '#3e6a9e';
-    ctx.fillText(':', detailX + 100, pdY);
+    ctx.fillText(':', detailX + 90, pdY);
 
     ctx.fillStyle = isLast ? '#00e0ff' : '#e8f0ff';
-    ctx.font = isLast ? 'bold 13px Arial, sans-serif' : 'bold 12px Arial, sans-serif';
-    ctx.fillText(val, detailX + 112, pdY);
-    pdY += 26;
+    ctx.font = isLast ? 'bold 12px Arial, sans-serif' : 'bold 11px Arial, sans-serif';
+    
+    // Truncate long value if needed
+    let displayVal = String(val);
+    if (displayVal.length > 32) {
+      displayVal = displayVal.substring(0, 30) + '..';
+    }
+    ctx.fillText(displayVal, detailX + 102, pdY);
+    pdY += 25;
   });
 
   yPos += card2H + 16;

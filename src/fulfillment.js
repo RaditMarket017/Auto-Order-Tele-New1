@@ -528,6 +528,11 @@ async function sendNotaAndTestimoni(orderId, orderData) {
       if (productDoc.exists) productData = productDoc.data();
     }
 
+    // Check if Nota Image is disabled
+    if (storeSettings.enableNotaImage === false) {
+      return null;
+    }
+
     const notaBuffer = await generateNotaPNG({
       orderId,
       customerName: orderData.customerName || 'Customer',

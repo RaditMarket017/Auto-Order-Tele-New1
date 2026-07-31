@@ -40,13 +40,12 @@
         <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
           <th class="py-3 px-3">Produk</th>
           <th class="py-3 px-3">Stok Ready</th>
-          <th class="py-3 px-3">Butuh Email</th>
           <th class="py-3 px-3 text-right">Kelola Stok & Aksi</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-800/60">
         {#if products.length === 0}
-          <tr><td colspan="4" class="py-6 text-center text-slate-500">Belum ada produk</td></tr>
+          <tr><td colspan="3" class="py-6 text-center text-slate-500">Belum ada produk</td></tr>
         {:else}
           {#each products as p}
             <tr class="hover:bg-slate-800/40 transition-colors">
@@ -64,15 +63,6 @@
                 <span class="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-xl text-xs font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">
                   {p.stock || 0} pcs
                 </span>
-              </td>
-              <td class="py-3 px-3">
-                <button 
-                  onclick={() => toggleQuickEmailInvite(p.id, !p.requiresEmail)} 
-                  title="Klik untuk ubah status Butuh Email" 
-                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer {p.requiresEmail ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 shadow-sm shadow-emerald-500/10' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-800'}"
-                >
-                  {p.requiresEmail ? '📧 ON' : '❌ OFF'}
-                </button>
               </td>
               <td class="py-3 px-3 text-right">
                 <div class="flex items-center justify-end gap-1.5">

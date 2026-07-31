@@ -74,12 +74,71 @@ async function renderOrderSummary(ctx, cart, lang, isEdit = true) {
     lang = await getUserLang(ctx.from.id);
   }
 
+  const rawVariant = cart.variantLabel || '-';
+  const lines = rawVariant.split('\n').map(l => l.trim()).filter(Boolean);
+  const varianTitle = lines[0] || rawVariant;
+
+  let durasi = cart.duration || '-';
+  let keterangan = cart.keterangan || '-';
+
+  if (lines.length > 1) {
+    lines.slice(1).forEach(l => {
+      if (/durasi/i.test(l)) {
+        durasi = l.replace(/^[⏳📌\s]*durasi\s*:\s*/i, '').trim();
+      } else if (/keterangan|hasil\s+give/i.test(l)) {
+        keterangan = l.replace(/^[⏳📌\s]*(keterangan\s*:\s*)?/i, '').trim();
+      }
+    });
+  }
+
+  let sisaStok = 0;
+  let terjualCount = 0;
+  if (cart.productId) {
+    try {
+      const prodDoc = await db.collection('products').doc(cart.productId).get();
+      if (prodDoc.exists) {
+        const prodData = prodDoc.data();
+        const variantObj = prodData.variants?.[cart.variantIndex] || prodData.variants?.[0];
+        if (variantObj) {
+          if (prodData.requiresEmail || variantObj.inviteEnabled) {
+            sisaStok = Number(variantObj.stock || 0);
+          } else {
+            const poolSnap = await db.collection('credentials_pool')
+              .where('productId', '==', cart.productId)
+              .where('variantLabel', '==', cart.variantLabel)
+              .where('isUsed', '==', false)
+              .get();
+            sisaStok = poolSnap.size;
+          }
+        }
+      }
+
+      const ordersSnap = await db.collection('orders')
+        .where('productId', '==', cart.productId)
+        .where('variantLabel', '==', cart.variantLabel)
+        .where('status', 'in', ['success', 'paid', 'completed'])
+        .get();
+      terjualCount = ordersSnap.size;
+    } catch (e) {
+      console.error('Error fetching stock/sold details:', e);
+    }
+  }
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Jakarta' });
+
   let msg = t(lang, 'order_summary', {
     product: escapeHTML(cart.productName),
-    variant: escapeHTML(cart.variantLabel),
+    variant: escapeHTML(varianTitle),
+    duration: escapeHTML(durasi),
+    keterangan: escapeHTML(keterangan),
+    stock: String(sisaStok),
+    sold: String(terjualCount),
     qty: cart.qty,
     unitPrice: formatIDR(cart.unitPrice),
+    subtotal: formatIDR(cart.unitPrice * cart.qty),
     total: formatIDR(cart.total),
+    time: timeStr,
   });
 
   if (cart.voucherCode) {

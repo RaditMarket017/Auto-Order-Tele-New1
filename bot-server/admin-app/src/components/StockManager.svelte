@@ -17,19 +17,19 @@
 
   // Feature Toggles
   let inviteEnabled = $state(false);
+  let inviteStockSlots = $state(5);
   let renewEnabled = $state(false);
   let maxRenew = $state(1);
   let renewStartDate = $state('');
   let renewScheduleDates = $state([]);
-  let renewNotReadyMessage = $state('Tombol renew belum aktif saat ini. Silakan coba kembali sesuai tanggal yang ditentukan.');
+  let renewNotReadyMessage = $state('Tombol renew belum aktif saat ini.');
 
   function addRenewTier() {
-    if (renewScheduleDates.length === 0) {
-      const firstDate = renewStartDate || new Date().toISOString().substring(0, 10);
-      renewScheduleDates = [firstDate, new Date().toISOString().substring(0, 10)];
-    } else {
-      renewScheduleDates = [...renewScheduleDates, new Date().toISOString().substring(0, 10)];
-    }
+    const nextTierIdx = renewScheduleDates.length + 1;
+    const nextDate = renewScheduleDates.length > 0 
+      ? renewScheduleDates[renewScheduleDates.length - 1] 
+      : (renewStartDate || new Date().toISOString().substring(0, 10));
+    renewScheduleDates = [...renewScheduleDates, nextDate];
     maxRenew = renewScheduleDates.length;
   }
 
@@ -60,6 +60,7 @@
 
     isSyncingSettings = true;
     inviteEnabled = Boolean(v.inviteEnabled ?? prod.requiresEmail);
+    inviteStockSlots = Number(v.stock || 5);
     renewEnabled = Boolean(v.renewEnabled);
     maxRenew = Number(v.maxRenew || 1);
     renewStartDate = v.renewStartDate || '';
@@ -470,31 +471,44 @@
           <h2 class="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
             📝 3. Input Data Akun Stok
           </h2>
-          <span class="text-[10px] text-slate-400 font-mono">Format Pipe `|` Fleksibel</span>
+          <span class="text-[10px] text-slate-400 font-mono">{inviteEnabled ? 'Mode Slot Invite' : 'Format Pipe | Fleksibel'}</span>
         </div>
 
-        <div class="bg-slate-950 border border-indigo-900/30 rounded-xl p-3 text-[11px] text-slate-300 space-y-1 font-mono">
-          <span class="text-sky-400 font-bold block mb-1">📋 Format yang didukung (1 akun per baris):</span>
-          <code>user | email | password | f2a | profil | tgl_exp</code><br>
-          <span class="text-slate-500">Contoh:</span><br>
-          <code class="text-emerald-400">user1 | user1@gmail.com | pass123 | 2FAKEY123 | Profile1 | 2026-12-31</code>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Tanggal Auto Hapus (Opsional)</label>
-            <input type="date" bind:value={expiredAtDate} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium focus:outline-none" />
+        {#if inviteEnabled}
+          <div class="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+            <span class="text-xs font-extrabold text-emerald-400 block">📧 Mode Invite Email Buyer Aktif</span>
+            <p class="text-[11px] text-slate-300">
+              Pelanggan akan memasukkan email mereka saat membeli varian ini. Anda cukup memasukkan <b>Jumlah Slot Stok (Pcs)</b> yang tersedia.
+            </p>
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-300 block mb-1">Jumlah Slot Stok (Pcs) <span class="text-rose-400">*</span></label>
+              <input type="number" min="0" bind:value={inviteStockSlots} placeholder="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-extrabold focus:border-emerald-500 focus:outline-none" />
+            </div>
           </div>
-          <div>
-            <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📁 Upload File .TXT</label>
-            <input type="file" accept=".txt" onchange={handleFileUpload} class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-sky-500/10 file:text-sky-400 cursor-pointer bg-slate-950 border border-slate-800 rounded-xl p-1" />
+        {:else}
+          <div class="bg-slate-950 border border-indigo-900/30 rounded-xl p-3 text-[11px] text-slate-300 space-y-1 font-mono">
+            <span class="text-sky-400 font-bold block mb-1">📋 Format yang didukung (1 akun per baris):</span>
+            <code>user | email | password | f2a | profil | tgl_exp</code><br>
+            <span class="text-slate-500">Contoh:</span><br>
+            <code class="text-emerald-400">user1 | user1@gmail.com | pass123 | 2FAKEY123 | Profile1 | 2026-12-31</code>
           </div>
-        </div>
 
-        <div>
-          <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Data Teks Akun</label>
-          <textarea bind:value={itemsText} rows="5" placeholder="user1|user1@gmail.com|pass123|2FAKEY123|Profile1|2026-12-31&#10;user2|user2@gmail.com|pass456|2FAKEY456|Profile2|2026-12-31" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none resize-y"></textarea>
-        </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Tanggal Auto Hapus (Opsional)</label>
+              <input type="date" bind:value={expiredAtDate} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium focus:outline-none" />
+            </div>
+            <div>
+              <label class="text-[11px] font-extrabold text-slate-400 block mb-1">📁 Upload File .TXT</label>
+              <input type="file" accept=".txt" onchange={handleFileUpload} class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-sky-500/10 file:text-sky-400 cursor-pointer bg-slate-950 border border-slate-800 rounded-xl p-1" />
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Data Teks Akun</label>
+            <textarea bind:value={itemsText} rows="5" placeholder="user1|user1@gmail.com|pass123|2FAKEY123|Profile1|2026-12-31&#10;user2|user2@gmail.com|pass456|2FAKEY456|Profile2|2026-12-31" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none resize-y"></textarea>
+          </div>
+        {/if}
 
         {#if submitStatus}
           <div class="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold animate-pulse">
@@ -503,7 +517,7 @@
         {/if}
 
         <button type="button" onclick={handleAddStock} class="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
-          ⚡ Tambahkan Stok ke Database Pool
+          ⚡ {inviteEnabled ? 'Simpan Slot Stok Invite' : 'Tambahkan Stok ke Database Pool'}
         </button>
       </div>
 

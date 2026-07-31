@@ -64,18 +64,26 @@ const translations = {
 
     // ─── Order Summary ───
     order_summary:
-      '🧾 <b><u>RINGKASAN PESANAN</u></b>\n\n' +
-      '<blockquote>' +
-      '<b>📦 Detail Item</b>\n' +
+      '🧾 <b><u>RINGKASAN PESANAN</u></b>\n' +
       '━━━━━━━━━━━━━━━━━\n' +
-      '• <b>Produk</b> : <b>{{product}}</b>\n' +
-      '• <b>Varian</b> : <i>{{variant}}</i>\n' +
-      '• <b>Jumlah</b> : <b>{{qty}}</b> pcs\n' +
-      '• <b>Harga</b>  : <b>{{unitPrice}}</b>' +
-      '</blockquote>\n\n' +
-      '<blockquote>' +
-      '💰 <b>TOTAL TAGIHAN</b> : <b><u>{{total}}</u></b>' +
-      '</blockquote>',
+      '📦 <b>DETAIL PRODUK</b>\n' +
+      '╭───────────────\n' +
+      '┊・<b>Produk</b> : {{product}}\n' +
+      '┊・<b>Varian</b> : {{variant}}\n' +
+      '┊・<b>Durasi</b> : {{duration}}\n' +
+      '┊・<b>Keterangan</b> : {{keterangan}}\n' +
+      '┊・<b>Sisa Stok</b> : 🟢  [ {{stock}} ]\n' +
+      '┊・<b>Terjual</b> : {{sold}} pcs\n' +
+      '╰───────────────\n' +
+      '🛒 <b>DETAIL PEMBELIAN</b>\n' +
+      '╭───────────────\n' +
+      '┊・<b>Jumlah</b> : {{qty}} pcs\n' +
+      '┊・<b>Harga Satuan</b> : {{unitPrice}}\n' +
+      '┊・<b>Total Harga</b> : {{subtotal}}\n' +
+      '╰───────────────\n' +
+      '💰 <b>TOTAL TAGIHAN</b> : <b><u>{{total}}</u></b>\n' +
+      '━━━━━━━━━━━━━━━━━\n' +
+      '🕒 <b>Waktu Transaksi</b>: {{time}}',
     order_voucher_applied: '🎁 <b>Voucher</b> : <code>{{code}}</code> (<i>-{{discount}}</i>)',
 
     // ─── Payment ───

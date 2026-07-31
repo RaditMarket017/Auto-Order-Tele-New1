@@ -15,6 +15,7 @@
   let adminProcessBusyTimeoutMinutes = $state(10);
 
   // Nota Settings
+  let enableNotaImage = $state(true);
   let notaStoreName = $state('');
   let notaLogoUrl = $state('');
   let notaBgColor = $state('#071428');
@@ -44,6 +45,7 @@
       warrantyUploadTimeoutMinutes = settingsRes.data.warrantyUploadTimeoutMinutes || 5;
       adminProcessBusyTimeoutMinutes = settingsRes.data.adminProcessBusyTimeoutMinutes || 10;
 
+      enableNotaImage = settingsRes.data.enableNotaImage !== false;
       notaStoreName = settingsRes.data.notaStoreName || settingsRes.data.storeName || '';
       notaLogoUrl = settingsRes.data.notaLogoUrl || settingsRes.data.storeLogoUrl || '';
       notaBgColor = settingsRes.data.notaBgColor || '#071428';
@@ -73,7 +75,7 @@
         mustJoinEnabled, requiredChannelId, requiredChannelLink,
         warrantyUploadTimeoutMinutes: Number(warrantyUploadTimeoutMinutes || 5),
         adminProcessBusyTimeoutMinutes: Number(adminProcessBusyTimeoutMinutes || 10),
-        notaStoreName, notaLogoUrl, notaBgColor, notaAccentColor, notaFooterText
+        enableNotaImage, notaStoreName, notaLogoUrl, notaBgColor, notaAccentColor, notaFooterText
       })
     });
     alert('Pengaturan toko, CS, Nota, Wajib Join & Waktu Garansi berhasil disimpan!');
@@ -85,8 +87,8 @@
   <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
     <div class="flex items-center justify-between">
       <div>
-        <h3 class="font-bold text-base text-white">⚠️ Maintenance Mode</h3>
-        <p class="text-[11px] text-slate-400">Kunci bot sementara saat tutup toko / perbaikan.</p>
+        <h3 class="font-bold text-base text-white">🚧 Mode Maintenance Toko</h3>
+        <p class="text-xs text-slate-400">Aktifkan untuk menutup toko sementara saat restok/perbaikan.</p>
       </div>
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" bind:checked={isMaintenance} onchange={toggleMaintenanceMode} class="sr-only peer">
@@ -103,6 +105,18 @@
   <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
     <h3 class="font-bold text-base text-white flex items-center gap-2">🧾 Desain & Pengaturan Nota Order</h3>
     <p class="text-[11px] text-slate-400">Kustomisasi tampilan nota gambar PNG yang dikirim otomatis ke pelanggan & channel testimoni.</p>
+    
+    <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl p-3">
+      <div>
+        <span class="text-xs font-bold text-white block">🖼️ Kirim Nota Gambar PNG</span>
+        <span class="text-[10px] text-slate-400">Jika OFF, nota transaksi dikirim dalam format teks HTML saja.</span>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer ml-2 shrink-0">
+        <input type="checkbox" bind:checked={enableNotaImage} class="sr-only peer">
+        <div class="w-10 h-5.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-sky-500"></div>
+      </label>
+    </div>
+
     <div class="space-y-3">
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">Nama Toko di Nota</label>

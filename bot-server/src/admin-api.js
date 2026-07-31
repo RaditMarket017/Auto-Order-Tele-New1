@@ -372,8 +372,26 @@ router.post('/stock/:productId', async (req, res) => {
     const prodData = prodDoc.data();
     const targetVariantLabel = variantLabel || prodData.variants?.[0]?.label || 'Default';
 
-    const lines = itemsText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return res.status(400).json({ success: false, error: 'Tidak ada baris stok valid' });
+    // Special handler for Invite Mode products (direct stock count slots)
+    if (inviteEnabled && req.body.inviteStockSlots !== undefined && req.body.inviteStockSlots !== null) {
+      const slotsCount = Math.max(0, Number(req.body.inviteStockSlots || 0));
+      const updatedVariants = (prodData.variants || []).map(v => {
+        if (v.label === targetVariantLabel) {
+          return {
+            ...v,
+            stock: slotsCount,
+            inviteEnabled: true,
+            renewEnabled: Boolean(renewEnabled),
+            warrantyEnabled: Boolean(warrantyEnabled),
+          };
+        }
+        return v;
+      });
+      await prodRef.update({ variants: updatedVariants });
+      return res.json({ success: true, addedCount: slotsCount, currentStock: slotsCount });
+    }
+
+    if (!itemsText) return res.status(400).json({ success: false, error: 'Text stok kosong' });
 
     // Compute optional expiration date
     let computedExpiredAt = null;
