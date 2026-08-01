@@ -843,6 +843,7 @@ router.get('/settings', async (req, res) => {
       success: true,
       data: {
         ...storeData,
+        botToken: sysData.botToken || storeData.botToken || config.BOT_TOKEN || '',
         mustJoinEnabled: sysData.mustJoinEnabled !== undefined ? sysData.mustJoinEnabled : (storeData.mustJoinEnabled !== false),
         requiredChannelId: sysData.requiredChannelId || storeData.requiredChannelId || config.REQUIRED_CHANNEL_ID || '',
         requiredChannelLink: sysData.requiredChannelLink || storeData.requiredChannelLink || config.REQUIRED_CHANNEL_LINK || '',
@@ -860,6 +861,7 @@ router.post('/settings', async (req, res) => {
 
     // Sync to system doc for fast bot lookup
     const sysUpdate = {};
+    if (body.botToken !== undefined) sysUpdate.botToken = body.botToken;
     if (body.mustJoinEnabled !== undefined) sysUpdate.mustJoinEnabled = Boolean(body.mustJoinEnabled);
     if (body.requiredChannelId !== undefined) sysUpdate.requiredChannelId = body.requiredChannelId;
     if (body.requiredChannelLink !== undefined) sysUpdate.requiredChannelLink = body.requiredChannelLink;
@@ -949,11 +951,24 @@ router.post('/broadcast', async (req, res) => {
       });
     }
 
+    // Fetch settings from Firestore
+    const sysDoc = await db.collection('settings').doc('system').get();
+    const storeDoc = await db.collection('settings').doc('store').get();
+    const sysData = sysDoc.exists ? sysDoc.data() : {};
+    const storeData = storeDoc.exists ? storeDoc.data() : {};
+
     // Initialize Telegraf bot
     const { Telegraf } = require('telegraf');
-    const token = config.BOT_TOKEN || process.env.BOT_TOKEN;
+    const token = sysData.botToken 
+      || storeData.botToken 
+      || config.BOT_TOKEN 
+      || process.env.BOT_TOKEN;
+
     if (!token) {
-      return res.status(400).json({ success: false, error: 'BOT_TOKEN Telegram belum dikonfigurasi di file .env!' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'BOT_TOKEN Telegram belum ditemukan. Pastikan Bot Telegram di Panel Pterodactyl sedang berjalan (otomatis sync), atau isi BOT_TOKEN di Pengaturan Toko.' 
+      });
     }
     const bot = new Telegraf(token);
 
@@ -964,10 +979,6 @@ router.post('/broadcast', async (req, res) => {
     // 3. Send to Channel if enabled
     if (sendToChannel) {
       try {
-        const sysDoc = await db.collection('settings').doc('system').get();
-        const storeDoc = await db.collection('settings').doc('store').get();
-        const sysData = sysDoc.exists ? sysDoc.data() : {};
-        const storeData = storeDoc.exists ? storeDoc.data() : {};
         const targetChannelId = sysData.requiredChannelId 
           || storeData.requiredChannelId 
           || config.REQUIRED_CHANNEL_ID 

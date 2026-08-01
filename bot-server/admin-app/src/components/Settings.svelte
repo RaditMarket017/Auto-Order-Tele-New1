@@ -4,6 +4,7 @@
 
   let storeName = $state('');
   let storeLogoUrl = $state('');
+  let botToken = $state('');
   let contactWhatsapp = $state('');
   let contactTelegram = $state('');
   let groupTelegram = $state('');
@@ -36,6 +37,7 @@
     if (settingsRes.success && settingsRes.data) {
       storeName = settingsRes.data.storeName || '';
       storeLogoUrl = settingsRes.data.storeLogoUrl || '';
+      botToken = settingsRes.data.botToken || '';
       contactWhatsapp = settingsRes.data.contactWhatsapp || '';
       contactTelegram = settingsRes.data.contactTelegram || '';
       groupTelegram = settingsRes.data.groupTelegram || '';
@@ -71,18 +73,29 @@
     await apiFetch('/api/admin/settings', {
       method: 'POST',
       body: JSON.stringify({ 
-        storeName, storeLogoUrl, contactWhatsapp, contactTelegram, groupTelegram, 
+        storeName, storeLogoUrl, botToken, contactWhatsapp, contactTelegram, groupTelegram, 
         mustJoinEnabled, requiredChannelId, requiredChannelLink,
         warrantyUploadTimeoutMinutes: Number(warrantyUploadTimeoutMinutes || 5),
         adminProcessBusyTimeoutMinutes: Number(adminProcessBusyTimeoutMinutes || 10),
         enableNotaImage, notaStoreName, notaLogoUrl, notaBgColor, notaAccentColor, notaFooterText
       })
     });
-    alert('Pengaturan toko, CS, Nota, Wajib Join & Waktu Garansi berhasil disimpan!');
+    alert('Pengaturan toko, Bot Token, CS, Nota, Wajib Join & Waktu Garansi berhasil disimpan!');
   }
 </script>
 
 <div class="space-y-6">
+  <!-- Bot Token Telegram Configurator -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+    <div>
+      <h3 class="font-bold text-base text-white">🤖 Bot Token Telegram</h3>
+      <p class="text-[11px] text-slate-400">Token bot Telegram untuk Broadcast Mini App Vercel. Otomatis ter-sync ketika bot panel berjalan, atau bisa Anda isi manual di sini.</p>
+    </div>
+    <div>
+      <label class="text-xs text-slate-400 font-semibold block mb-1">BOT_TOKEN Telegram</label>
+      <input type="text" bind:value={botToken} placeholder="8848099512:AAHTIwERYah-..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-emerald-400 font-mono focus:border-sky-500 focus:outline-none">
+    </div>
+  </div>
   <!-- Maintenance Mode Switch -->
   <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
     <div class="flex items-center justify-between">

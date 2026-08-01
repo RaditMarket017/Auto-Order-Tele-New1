@@ -38,6 +38,14 @@ const bot = new Telegraf(config.BOT_TOKEN, botOptions);
 registerWarrantyRenewHandlers(bot);
 registerReviewHandlers(bot);
 
+// Sync BOT_TOKEN & system config to Firestore so Vercel Admin App can access it automatically
+if (config.BOT_TOKEN) {
+  db.collection('settings').doc('system').set({
+    botToken: config.BOT_TOKEN,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true }).catch(err => console.error('Failed to sync botToken to Firestore:', err.message));
+}
+
 // ═══════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════
