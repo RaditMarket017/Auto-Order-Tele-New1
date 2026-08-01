@@ -373,7 +373,7 @@ router.post('/stock/:productId', async (req, res) => {
     const targetVariantLabel = variantLabel || prodData.variants?.[0]?.label || 'Default';
 
     // Special handler for Invite Mode products (direct stock count slots)
-    if (inviteEnabled || req.body.inviteStockSlots !== undefined) {
+    if (Boolean(inviteEnabled)) {
       const slotsCount = Math.max(0, Number(req.body.inviteStockSlots ?? inviteStockSlots ?? 0));
       const updatedVariants = (prodData.variants || []).map(v => {
         if (v.label === targetVariantLabel) {
@@ -481,8 +481,18 @@ router.post('/stock/:productId', async (req, res) => {
       .where('isUsed', '==', false)
       .get();
 
+    const updatedVariants = (prodData.variants || []).map(v => {
+      if (v.label === targetVariantLabel) {
+        return {
+          ...v,
+          inviteEnabled: false,
+        };
+      }
+      return v;
+    });
+
     const totalStock = poolSnap.size;
-    await prodRef.update({ stock: totalStock });
+    await prodRef.update({ variants: updatedVariants, stock: totalStock });
 
     res.json({ success: true, addedCount: lines.length, currentStock: totalStock, expiredAt: computedExpiredAt });
   } catch (err) {
@@ -943,7 +953,7 @@ router.post('/broadcast', async (req, res) => {
     const { Telegraf } = require('telegraf');
     const token = config.BOT_TOKEN || process.env.BOT_TOKEN;
     if (!token) {
-      return res.status(500).json({ success: false, error: 'BOT_TOKEN tidak dikonfigurasi!' });
+      return res.status(400).json({ success: false, error: 'BOT_TOKEN Telegram belum dikonfigurasi di file .env!' });
     }
     const bot = new Telegraf(token);
 
@@ -958,18 +968,27 @@ router.post('/broadcast', async (req, res) => {
         const storeDoc = await db.collection('settings').doc('store').get();
         const sysData = sysDoc.exists ? sysDoc.data() : {};
         const storeData = storeDoc.exists ? storeDoc.data() : {};
-        const targetChannelId = sysData.requiredChannelId || storeData.requiredChannelId || config.REQUIRED_CHANNEL_ID || config.TESTIMONI_CHANNEL_ID;
+        const targetChannelId = sysData.requiredChannelId 
+          || storeData.requiredChannelId 
+          || config.REQUIRED_CHANNEL_ID 
+          || config.TESTIMONI_CHANNEL_ID 
+          || process.env.REQUIRED_CHANNEL_ID 
+          || process.env.TESTIMONI_CHANNEL_ID 
+          || process.env.CHANNEL_ID;
 
-        if (targetChannelId) {
-          if (usePng && pngBuffer) {
-            await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
-          } else {
-            await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
-          }
-          channelSent = true;
+        if (!targetChannelId) {
+          return res.status(400).json({ success: false, error: 'Target Channel Telegram belum dikonfigurasi! Silakan atur Channel ID di Pengaturan Toko atau file .env.' });
         }
+
+        if (usePng && pngBuffer) {
+          await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+        } else {
+          await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
+        }
+        channelSent = true;
       } catch (err) {
         console.error('Broadcast Channel Error:', err);
+        return res.status(400).json({ success: false, error: `Gagal mengirim ke Channel Telegram: ${err.message}` });
       }
     }
 
