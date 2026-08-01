@@ -394,6 +394,9 @@ router.post('/stock/:productId', async (req, res) => {
 
     if (!itemsText) return res.status(400).json({ success: false, error: 'Text stok kosong' });
 
+    const lines = itemsText.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return res.status(400).json({ success: false, error: 'Tidak ada baris teks stok yang valid' });
+
     // Compute optional expiration date
     let computedExpiredAt = null;
     if (expiredAt) {
