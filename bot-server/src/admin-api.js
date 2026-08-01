@@ -443,8 +443,17 @@ router.post('/stock/:productId', async (req, res) => {
       };
 
       if (parts.length > 1) {
-        // Smart Parser for user|email|password|f2a|profil|tgl_exp or user|password|email|f2a|profil|tgl_exp
-        if (parts[1] && parts[1].includes('@')) {
+        // Multi-field parser: User | Email | Password | Link Invite | F2A | PIN | Profil | Tgl Auto Hapus
+        if (parts.length >= 7 || parts.some(p => p.includes('http://') || p.includes('https://') || p.includes('t.me/') || p.includes('invite'))) {
+          parsedItem.username = parts[0] || '';
+          parsedItem.email = parts[1] || '';
+          parsedItem.password = parts[2] || '';
+          parsedItem.inviteLink = parts[3] || '';
+          parsedItem.f2aSecret = parts[4] || '';
+          parsedItem.pin = parts[5] || '';
+          parsedItem.profile = parts[6] || '';
+          var deleteInput = parts[7] || '';
+        } else if (parts[1] && parts[1].includes('@')) {
           parsedItem.username = parts[0] || '';
           parsedItem.email = parts[1] || '';
           parsedItem.password = parts[2] || '';
@@ -458,6 +467,14 @@ router.post('/stock/:productId', async (req, res) => {
           parsedItem.f2aSecret = parts[3] || '';
           parsedItem.profile = parts[4] || '';
           var deleteInput = parts[5] || '';
+        }
+
+        // Smart check if any part is a link/URL
+        for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+          const val = parts[pIdx];
+          if ((val.startsWith('http://') || val.startsWith('https://') || val.includes('t.me/') || val.includes('invite')) && !parsedItem.inviteLink) {
+            parsedItem.inviteLink = val;
+          }
         }
 
         if (deleteInput) {
@@ -516,9 +533,11 @@ router.put('/stock/item/:itemId', async (req, res) => {
     const itemData = itemDoc.data();
     const updateData = {};
     if (body.username !== undefined) updateData.username = body.username;
-    if (body.password !== undefined) updateData.password = body.password;
     if (body.email !== undefined) updateData.email = body.email;
+    if (body.password !== undefined) updateData.password = body.password;
+    if (body.inviteLink !== undefined) updateData.inviteLink = body.inviteLink;
     if (body.f2aSecret !== undefined) updateData.f2aSecret = body.f2aSecret;
+    if (body.pin !== undefined) updateData.pin = body.pin;
     if (body.profile !== undefined) updateData.profile = body.profile;
     if (body.expiredAt !== undefined) updateData.expiredAt = body.expiredAt ? new Date(body.expiredAt).toISOString() : null;
 
@@ -537,12 +556,14 @@ router.put('/stock/item/:itemId', async (req, res) => {
     if (body.warrantyTimeoutMessage !== undefined) updateData.warrantyTimeoutMessage = body.warrantyTimeoutMessage;
     if (body.warrantyCsMessage !== undefined) updateData.warrantyCsMessage = body.warrantyCsMessage;
 
-    // Update raw data format text
+    // Update raw data format text: User | Email | Password | Link Invite | F2A | PIN | Profil
     const parts = [
       updateData.username !== undefined ? updateData.username : (itemData.username || ''),
       updateData.email !== undefined ? updateData.email : (itemData.email || ''),
       updateData.password !== undefined ? updateData.password : (itemData.password || ''),
+      updateData.inviteLink !== undefined ? updateData.inviteLink : (itemData.inviteLink || ''),
       updateData.f2aSecret !== undefined ? updateData.f2aSecret : (itemData.f2aSecret || ''),
+      updateData.pin !== undefined ? updateData.pin : (itemData.pin || ''),
       updateData.profile !== undefined ? updateData.profile : (itemData.profile || ''),
     ].filter(Boolean);
 

@@ -246,40 +246,48 @@ function formatCredentialItem(credItem, index) {
 
   let raw = '';
   let username = '';
-  let password = '';
   let email = '';
+  let password = '';
+  let inviteLink = '';
   let f2aSecret = '';
+  let pin = '';
   let profile = '';
 
   if (typeof credItem === 'object') {
     raw = (credItem.data || credItem.text || '').toString().trim();
     username = credItem.username || '';
-    password = credItem.password || '';
     email = credItem.email || '';
+    password = credItem.password || '';
+    inviteLink = credItem.inviteLink || '';
     f2aSecret = credItem.f2aSecret || '';
+    pin = credItem.pin || '';
     profile = credItem.profile || '';
   } else {
     raw = (credItem || '').toString().trim();
   }
 
-  if (username || password || email || f2aSecret || profile) {
+  if (username || email || password || inviteLink || f2aSecret || pin || profile) {
     let out = `<b><u>AKUN #${index + 1}</u></b>\n`;
-    if (username) out += `👤 <b>User</b>     : <code>${escapeHTML(username)}</code>\n`;
-    if (password) out += `🔑 <b>Password</b> : <code>${escapeHTML(password)}</code>\n`;
-    if (email)    out += `📧 <b>Email</b>    : <code>${escapeHTML(email)}</code>\n`;
-    if (f2aSecret) out += `🔐 <b>F2A</b>      : <code>${escapeHTML(f2aSecret)}</code>\n`;
-    if (profile)  out += `👤 <b>Profil</b>   : <code>${escapeHTML(profile)}</code>\n`;
+    if (username)   out += `👤 <b>User</b>        : <code>${escapeHTML(username)}</code>\n`;
+    if (email)      out += `📧 <b>Email</b>       : <code>${escapeHTML(email)}</code>\n`;
+    if (password)   out += `🔑 <b>Password</b>    : <code>${escapeHTML(password)}</code>\n`;
+    if (inviteLink) out += `🔗 <b>Link Invite</b> : <code>${escapeHTML(inviteLink)}</code>\n`;
+    if (f2aSecret)  out += `🔐 <b>F2A</b>         : <code>${escapeHTML(f2aSecret)}</code>\n`;
+    if (pin)        out += `📌 <b>PIN</b>         : <code>${escapeHTML(pin)}</code>\n`;
+    if (profile)    out += `👤 <b>Profil</b>      : <code>${escapeHTML(profile)}</code>\n`;
     return out.trim();
   }
 
   if (raw.includes('|')) {
     const parts = raw.split('|').map(s => s.trim());
     let out = `<b><u>AKUN #${index + 1}</u></b>\n`;
-    if (parts[0]) out += `👤 <b>User</b>     : <code>${escapeHTML(parts[0])}</code>\n`;
-    if (parts[1]) out += `🔑 <b>Password</b> : <code>${escapeHTML(parts[1])}</code>\n`;
-    if (parts[2]) out += `📧 <b>Email</b>    : <code>${escapeHTML(parts[2])}</code>\n`;
-    if (parts[3]) out += `🔐 <b>F2A</b>      : <code>${escapeHTML(parts[3])}</code>\n`;
-    if (parts[4]) out += `👤 <b>Profil</b>   : <code>${escapeHTML(parts[4])}</code>\n`;
+    if (parts[0]) out += `👤 <b>User</b>        : <code>${escapeHTML(parts[0])}</code>\n`;
+    if (parts[1]) out += `📧 <b>Email</b>       : <code>${escapeHTML(parts[1])}</code>\n`;
+    if (parts[2]) out += `🔑 <b>Password</b>    : <code>${escapeHTML(parts[2])}</code>\n`;
+    if (parts[3]) out += `🔗 <b>Link Invite</b> : <code>${escapeHTML(parts[3])}</code>\n`;
+    if (parts[4]) out += `🔐 <b>F2A</b>         : <code>${escapeHTML(parts[4])}</code>\n`;
+    if (parts[5]) out += `📌 <b>PIN</b>         : <code>${escapeHTML(parts[5])}</code>\n`;
+    if (parts[6]) out += `👤 <b>Profil</b>      : <code>${escapeHTML(parts[6])}</code>\n`;
     return out.trim();
   }
 

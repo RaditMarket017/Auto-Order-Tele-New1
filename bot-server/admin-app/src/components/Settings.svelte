@@ -14,6 +14,13 @@
 
   let warrantyUploadTimeoutMinutes = $state(5);
   let adminProcessBusyTimeoutMinutes = $state(10);
+  let adminBusyMessageTemplate = $state(
+    `Mohon maaf ya kak\n` +
+    `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
+    `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
+    `Jadi claim kamu tetap kami proses ya.\n\n` +
+    `Mohon ditunggu sebentar 🙏`
+  );
 
   // Nota Settings
   let enableNotaImage = $state(true);
@@ -46,6 +53,13 @@
       requiredChannelLink = settingsRes.data.requiredChannelLink || '';
       warrantyUploadTimeoutMinutes = settingsRes.data.warrantyUploadTimeoutMinutes || 5;
       adminProcessBusyTimeoutMinutes = settingsRes.data.adminProcessBusyTimeoutMinutes || 10;
+      adminBusyMessageTemplate = settingsRes.data.adminBusyMessageTemplate || (
+        `Mohon maaf ya kak\n` +
+        `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
+        `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
+        `Jadi claim kamu tetap kami proses ya.\n\n` +
+        `Mohon ditunggu sebentar 🙏`
+      );
 
       enableNotaImage = settingsRes.data.enableNotaImage !== false;
       notaStoreName = settingsRes.data.notaStoreName || settingsRes.data.storeName || '';
@@ -77,6 +91,7 @@
         mustJoinEnabled, requiredChannelId, requiredChannelLink,
         warrantyUploadTimeoutMinutes: Number(warrantyUploadTimeoutMinutes || 5),
         adminProcessBusyTimeoutMinutes: Number(adminProcessBusyTimeoutMinutes || 10),
+        adminBusyMessageTemplate,
         enableNotaImage, notaStoreName, notaLogoUrl, notaBgColor, notaAccentColor, notaFooterText
       })
     });
@@ -85,6 +100,41 @@
 </script>
 
 <div class="space-y-6">
+  <!-- Warranty Timers & Auto Notification Configurator -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
+    <div>
+      <h3 class="font-bold text-base text-white flex items-center gap-2">🛡️ Waktu & Notifikasi Klaim Garansi</h3>
+      <p class="text-[11px] text-slate-400">Atur batas waktu pengiriman bukti customer dan notifikasi otomatis saat Admin belum memproses klaim garansi.</p>
+    </div>
+
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">⏰ Batas Kirim Bukti</label>
+          <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+            <input type="number" min="1" max="60" bind:value={warrantyUploadTimeoutMinutes} class="w-full bg-transparent text-xs text-amber-400 font-bold focus:outline-none">
+            <span class="text-[11px] text-slate-400">menit</span>
+          </div>
+          <span class="text-[10px] text-slate-500 block mt-0.5">Setelah klik tombol garansi.</span>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">⏳ Notif Admin Sibuk</label>
+          <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+            <input type="number" min="1" max="120" bind:value={adminProcessBusyTimeoutMinutes} class="w-full bg-transparent text-xs text-sky-400 font-bold focus:outline-none">
+            <span class="text-[11px] text-slate-400">menit</span>
+          </div>
+          <span class="text-[10px] text-slate-500 block mt-0.5">Jika admin belum merespon.</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400 font-semibold block mb-1">💬 Template Pesan Admin Sibuk</label>
+        <textarea rows="5" bind:value={adminBusyMessageTemplate} placeholder="Template pesan otomatis..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:border-sky-500 focus:outline-none resize-y font-mono"></textarea>
+        <span class="text-[10px] text-sky-400/80 block mt-1">Gunakan tag: <code>{{order_id}}</code> dan <code>{{jam_kirim}}</code></span>
+      </div>
+    </div>
+  </div>
   <!-- Bot Token Telegram Configurator -->
   <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-md">
     <div>

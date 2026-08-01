@@ -134,9 +134,11 @@
         method: 'PUT',
         body: JSON.stringify({
           username: editingItem.username,
-          password: editingItem.password,
           email: editingItem.email,
+          password: editingItem.password,
+          inviteLink: editingItem.inviteLink,
           f2aSecret: editingItem.f2aSecret,
+          pin: editingItem.pin,
           profile: editingItem.profile,
           expiredAt: editingItem.expiredAtDate || null,
           isInviteItem: editingItem.isInviteItem,
@@ -491,9 +493,9 @@
         {:else}
           <div class="bg-slate-950 border border-indigo-900/30 rounded-xl p-3 text-[11px] text-slate-300 space-y-1 font-mono">
             <span class="text-sky-400 font-bold block mb-1">📋 Format yang didukung (1 akun per baris):</span>
-            <code>user | email | password | f2a | profil | tgl_exp</code><br>
+            <code>user | email | password | link_invite | f2a | pin | profil | tgl_exp</code><br>
             <span class="text-slate-500">Contoh:</span><br>
-            <code class="text-emerald-400">user1 | user1@gmail.com | pass123 | 2FAKEY123 | Profile1 | 2026-12-31</code>
+            <code class="text-emerald-400">user1 | user1@gmail.com | pass123 | https://family.canva.com/join?code=XYZ | 2FAKEY123 | 1234 | Profile1 | 2026-12-31</code>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -509,7 +511,7 @@
 
           <div>
             <label class="text-[11px] font-extrabold text-slate-400 block mb-1">Data Teks Akun</label>
-            <textarea bind:value={itemsText} rows="5" placeholder="user1|user1@gmail.com|pass123|2FAKEY123|Profile1|2026-12-31&#10;user2|user2@gmail.com|pass456|2FAKEY456|Profile2|2026-12-31" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none resize-y"></textarea>
+            <textarea bind:value={itemsText} rows="5" placeholder="user1|user1@gmail.com|pass123|https://family.canva.com/join?code=XYZ|2FAKEY123|1234|Profile1|2026-12-31&#10;user2|user2@gmail.com|pass456||2FAKEY456||Profile2|2026-12-31" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:border-emerald-500 focus:outline-none resize-y"></textarea>
           </div>
         {/if}
 
@@ -573,9 +575,20 @@
                       {escapeHTML(item.username ? `${item.username} | ${item.email || '-'} | ${item.password}` : (item.data || item.text))}
                     </div>
 
-                    {#if item.f2aSecret || item.profile}
-                      <div class="text-[10px] text-slate-400 truncate">
-                        🔑 2FA: <span class="text-amber-300 font-bold">{item.f2aSecret || '-'}</span> | 👤 Profil: <span class="text-violet-300 font-bold">{item.profile || '-'}</span>
+                    {#if item.inviteLink || item.f2aSecret || item.pin || item.profile}
+                      <div class="text-[10px] text-slate-400 truncate flex items-center gap-2 flex-wrap">
+                        {#if item.inviteLink}
+                          <span>🔗 Link: <span class="text-sky-300 font-bold">{item.inviteLink}</span></span>
+                        {/if}
+                        {#if item.f2aSecret}
+                          <span>🔐 2FA: <span class="text-amber-300 font-bold">{item.f2aSecret}</span></span>
+                        {/if}
+                        {#if item.pin}
+                          <span>📌 PIN: <span class="text-emerald-300 font-bold">{item.pin}</span></span>
+                        {/if}
+                        {#if item.profile}
+                          <span>👤 Profil: <span class="text-violet-300 font-bold">{item.profile}</span></span>
+                        {/if}
                       </div>
                     {/if}
 
@@ -644,19 +657,30 @@
             <input type="text" bind:value={editingItem.username} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold">
           </div>
           <div>
-            <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Password</label>
-            <input type="text" bind:value={editingItem.password} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold">
+            <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Email</label>
+            <input type="text" bind:value={editingItem.email} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Email</label>
-            <input type="text" bind:value={editingItem.email} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold">
+            <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Password</label>
+            <input type="text" bind:value={editingItem.password} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold">
           </div>
+          <div>
+            <label class="text-[10px] font-bold text-sky-400 block mb-0.5">🔗 Link Invite</label>
+            <input type="text" bind:value={editingItem.inviteLink} placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-sky-300 font-bold">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="text-[10px] font-bold text-slate-400 block mb-0.5">F2A Secret</label>
             <input type="text" bind:value={editingItem.f2aSecret} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-emerald-400 block mb-0.5">📌 PIN</label>
+            <input type="text" bind:value={editingItem.pin} placeholder="1234" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-300 font-bold">
           </div>
         </div>
 

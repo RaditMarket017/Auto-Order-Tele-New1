@@ -18,24 +18,24 @@ async function generateRestockPNG(data = {}) {
   // Draw base template image
   ctx.drawImage(bgImg, 0, 0);
 
-  // 1. Render APK Logo inside top-center frame
-  const logoX = 400;
-  const logoY = 220;
-  const logoW = 454;
-  const logoH = 375;
-  const r = 24;
+  // 1. Render APK Logo inside top-center frame (fitted for updated restock.jpg template)
+  const frameX = 362;
+  const frameY = 180;
+  const frameW = 514;
+  const frameH = 434;
+  const r = 30;
 
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(logoX + r, logoY);
-  ctx.lineTo(logoX + logoW - r, logoY);
-  ctx.quadraticCurveTo(logoX + logoW, logoY, logoX + logoW, logoY + r);
-  ctx.lineTo(logoX + logoW, logoY + logoH - r);
-  ctx.quadraticCurveTo(logoX + logoW, logoY + logoH, logoX + logoW - r, logoY + logoH);
-  ctx.lineTo(logoX + r, logoY + logoH);
-  ctx.quadraticCurveTo(logoX, logoY + logoH, logoX, logoY + logoH - r);
-  ctx.lineTo(logoX, logoY + r);
-  ctx.quadraticCurveTo(logoX, logoY, logoX + r, logoY);
+  ctx.moveTo(frameX + r, frameY);
+  ctx.lineTo(frameX + frameW - r, frameY);
+  ctx.quadraticCurveTo(frameX + frameW, frameY, frameX + frameW, frameY + r);
+  ctx.lineTo(frameX + frameW, frameY + frameH - r);
+  ctx.quadraticCurveTo(frameX + frameW, frameY + frameH, frameX + frameW - r, frameY + frameH);
+  ctx.lineTo(frameX + r, frameY + frameH);
+  ctx.quadraticCurveTo(frameX, frameY + frameH, frameX, frameY + frameH - r);
+  ctx.lineTo(frameX, frameY + r);
+  ctx.quadraticCurveTo(frameX, frameY, frameX + r, frameY);
   ctx.closePath();
   ctx.clip();
 
@@ -43,7 +43,22 @@ async function generateRestockPNG(data = {}) {
   if (data.apkLogoUrl && data.apkLogoUrl.trim().length > 0) {
     try {
       const logoImg = await loadImage(data.apkLogoUrl.trim());
-      ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+      // Maintain 1:1 aspect ratio centered inside the frame
+      const imgAspect = (logoImg.width && logoImg.height) ? (logoImg.width / logoImg.height) : 1;
+      let drawW = frameW;
+      let drawH = frameH;
+      let drawX = frameX;
+      let drawY = frameY;
+
+      if (imgAspect > 1) {
+        drawH = frameW / imgAspect;
+        drawY = frameY + (frameH - drawH) / 2;
+      } else if (imgAspect < 1) {
+        drawW = frameH * imgAspect;
+        drawX = frameX + (frameW - drawW) / 2;
+      }
+
+      ctx.drawImage(logoImg, drawX, drawY, drawW, drawH);
       logoLoaded = true;
     } catch (err) {
       console.warn('Failed to load apkLogoUrl for broadcast PNG:', err.message);
@@ -52,49 +67,69 @@ async function generateRestockPNG(data = {}) {
 
   if (!logoLoaded) {
     // Fallback: Gradient background with initial or product name
-    const grad = ctx.createLinearGradient(logoX, logoY, logoX + logoW, logoY + logoH);
+    const grad = ctx.createLinearGradient(frameX, frameY, frameX + frameW, frameY + frameH);
     grad.addColorStop(0, '#041c38');
-    grad.addColorStop(0.5, '#0052cc');
-    grad.addColorStop(1, '#0099ff');
+    grad.addColorStop(0.5, '#0044aa');
+    grad.addColorStop(1, '#0088ff');
     ctx.fillStyle = grad;
-    ctx.fillRect(logoX, logoY, logoW, logoH);
+    ctx.fillRect(frameX, frameY, frameW, frameH);
 
     const initial = (data.productName || 'APK').charAt(0).toUpperCase();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 110px sans-serif';
+    ctx.font = 'bold 120px Arial, "DejaVu Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
     ctx.shadowBlur = 15;
-    ctx.fillText(initial, logoX + logoW / 2, logoY + logoH / 2);
+    ctx.fillText(initial, frameX + frameW / 2, frameY + frameH / 2);
   }
   ctx.restore();
 
   // 2. Render Text Fields into boxes
   const fields = [
-    { key: 'productName', val: (data.productName || '-').toUpperCase(), centerY: 681 },
-    { key: 'duration', val: (data.duration || '-').toUpperCase(), centerY: 792 },
-    { key: 'keterangan', val: (data.keterangan || '-').toUpperCase(), centerY: 903 },
-    { key: 'price', val: (data.price || '-').toUpperCase(), centerY: 1014 },
-    { key: 'freshBilling', val: (data.freshBilling || '-').toUpperCase(), centerY: 1125 },
+    { key: 'productName', val: (data.productName || '-').toString().toUpperCase(), centerY: 749 },
+    { key: 'duration', val: (data.duration || '-').toString().toUpperCase(), centerY: 847 },
+    { key: 'keterangan', val: (data.keterangan || '-').toString().toUpperCase(), centerY: 945 },
+    { key: 'price', val: (data.price || '-').toString().toUpperCase(), centerY: 1044 },
+    { key: 'freshBilling', val: (data.freshBilling || '-').toString().toUpperCase(), centerY: 1142 },
   ];
 
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#00f0ff'; // Cyber neon cyan
-  ctx.shadowColor = 'rgba(0, 240, 255, 0.65)';
-  ctx.shadowBlur = 10;
+  const textStartX = 430; // 28px gap from left divider line
+  const maxTextWidth = 650;
 
   fields.forEach(f => {
     let fontSize = 34;
-    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.save();
+    
+    // Reset shadow first to prevent Linux Skia/Cairo canvas text transparency issue
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 
-    // Auto shrink font size if string overflows box width
-    while (ctx.measureText(f.val).width > 750 && fontSize > 16) {
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
+
+    // Auto shrink font size if string overflows box width (max 650px)
+    while (ctx.measureText(f.val).width > maxTextWidth && fontSize > 16) {
       fontSize -= 2;
-      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
     }
-    ctx.fillText(f.val, 405, f.centerY);
+
+    // Pass 1: Subtle Neon Blue/Cyan Glow
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.9)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#00f0ff';
+    ctx.fillText(f.val, textStartX, f.centerY);
+
+    // Pass 2: Clean crisp solid text fill on top
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#00ffff';
+    ctx.fillText(f.val, textStartX, f.centerY);
+
+    ctx.restore();
   });
 
   return canvas.toBuffer('image/png');

@@ -32,14 +32,16 @@ function getWarrantyInfo(order) {
   }
 
   // Check if warranty has already been claimed (1x max per order) or expired via photo upload timeout
+  const uploadExpired = order.warrantyClaimStatus === 'pending_proof' && order.uploadDeadlineAt && nowMs > new Date(order.uploadDeadlineAt).getTime();
   const alreadyClaimed = Boolean(order.warrantyClaimed) || 
     (Array.isArray(order.warrantyClaims) && order.warrantyClaims.length > 0) || 
     Boolean(order.lastWarrantyStatus) || 
-    order.warrantyClaimStatus === 'expired_timeout';
+    order.warrantyClaimStatus === 'expired_timeout' ||
+    uploadExpired;
 
   if (alreadyClaimed) {
-    const isTimeout = order.warrantyClaimStatus === 'expired_timeout';
-    const timeoutMsg = order.warrantyTimeoutMessage || 'Garansi sudah hangus karena tidak ada bukti yang dikirim sebelumnya.';
+    const isTimeout = order.warrantyClaimStatus === 'expired_timeout' || uploadExpired;
+    const timeoutMsg = order.warrantyTimeoutMessage || 'Garansi sudah hangus karena batas waktu pengiriman bukti telah habis.';
     const customExpiredMsg = order.warrantyExpiredMessage || 'Klaim Garansi Telah Digunakan (1x)';
     return {
       hasWarranty: true,
@@ -263,6 +265,23 @@ async function checkPendingWarrantyAdminBusyTimeouts(bot) {
     const busyTimeoutMs = busyTimeoutMins * 60 * 1000;
     const now = Date.now();
 
+    // 1. Cleanup expired pending_proof sessions (upload proof timeout)
+    const proofTimeoutSnap = await db.collection('orders')
+      .where('warrantyClaimStatus', '==', 'pending_proof')
+      .get();
+
+    for (const doc of proofTimeoutSnap.docs) {
+      const order = doc.data();
+      if (order.uploadDeadlineAt && now > new Date(order.uploadDeadlineAt).getTime()) {
+        await doc.ref.update({
+          warrantyClaimed: true,
+          warrantyClaimStatus: 'expired_timeout',
+          lastWarrantyStatus: 'expired_timeout',
+        });
+      }
+    }
+
+    // 2. Check orders waiting for Admin response > busyTimeoutMins (10 mins default)
     const snapshot = await db.collection('orders')
       .where('warrantyClaimStatus', '==', 'pending_admin')
       .where('adminBusyNotified', '==', false)
@@ -280,12 +299,17 @@ async function checkPendingWarrantyAdminBusyTimeouts(bot) {
 
         if (order.telegramUserId) {
           const jamKirim = order.proofReceivedAt || `${formatDateID(receivedMs).timeStr} WIB (${formatDateID(receivedMs).dateStr})`;
-          const autoMsg =
+          const defaultMsg =
             `Mohon maaf ya kak\n` +
-            `Claim garansi untuk order ${order.id} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
-            `Tapi tenang aja, bukti kamu sudah kami terima pada ${jamKirim} dan masih dalam waktu garansi.\n` +
+            `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
+            `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
             `Jadi claim kamu tetap kami proses ya.\n\n` +
             `Mohon ditunggu sebentar 🙏`;
+
+          const template = storeSettings.adminBusyMessageTemplate || defaultMsg;
+          const autoMsg = template
+            .replace(/\{\{order_id\}\}/g, order.id)
+            .replace(/\{\{jam_kirim\}\}/g, jamKirim);
 
           await bot.telegram.sendMessage(order.telegramUserId, autoMsg).catch(() => {});
         }
