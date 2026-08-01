@@ -40,10 +40,14 @@ registerReviewHandlers(bot);
 
 // Sync BOT_TOKEN & system config to Firestore so Vercel Admin App can access it automatically
 if (config.BOT_TOKEN) {
-  db.collection('settings').doc('system').set({
+  const syncData = {
     botToken: config.BOT_TOKEN,
     updatedAt: new Date().toISOString(),
-  }, { merge: true }).catch(err => console.error('Failed to sync botToken to Firestore:', err.message));
+  };
+  const channelId = config.REQUIRED_CHANNEL_ID || config.TESTIMONI_CHANNEL_ID || process.env.REQUIRED_CHANNEL_ID || process.env.TESTIMONI_CHANNEL_ID || process.env.CHANNEL_ID;
+  if (channelId) syncData.requiredChannelId = channelId;
+
+  db.collection('settings').doc('system').set(syncData, { merge: true }).catch(err => console.error('Failed to sync botToken to Firestore:', err.message));
 }
 
 // ═══════════════════════════════════════

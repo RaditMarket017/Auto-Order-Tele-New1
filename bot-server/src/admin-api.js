@@ -977,6 +977,9 @@ router.post('/broadcast', async (req, res) => {
     let userFailedCount = 0;
 
     // 3. Send to Channel if enabled
+    let channelError = null;
+
+    // 3. Send to Channel if enabled
     if (sendToChannel) {
       try {
         const targetChannelId = sysData.requiredChannelId 
@@ -988,18 +991,27 @@ router.post('/broadcast', async (req, res) => {
           || process.env.CHANNEL_ID;
 
         if (!targetChannelId) {
-          return res.status(400).json({ success: false, error: 'Target Channel Telegram belum dikonfigurasi! Silakan atur Channel ID di Pengaturan Toko atau file .env.' });
-        }
-
-        if (usePng && pngBuffer) {
-          await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+          channelError = 'Target Channel ID belum dikonfigurasi di Pengaturan Toko.';
+          if (!sendToUsers) {
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Target Channel Telegram belum dikonfigurasi! Silakan isi Username / ID Channel di Pengaturan Toko.' 
+            });
+          }
         } else {
-          await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
+          if (usePng && pngBuffer) {
+            await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+          } else {
+            await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
+          }
+          channelSent = true;
         }
-        channelSent = true;
       } catch (err) {
         console.error('Broadcast Channel Error:', err);
-        return res.status(400).json({ success: false, error: `Gagal mengirim ke Channel Telegram: ${err.message}` });
+        channelError = err.message;
+        if (!sendToUsers) {
+          return res.status(400).json({ success: false, error: `Gagal mengirim ke Channel Telegram: ${err.message}` });
+        }
       }
     }
 
