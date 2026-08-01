@@ -131,7 +131,7 @@
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">💬 Template Pesan Admin Sibuk</label>
         <textarea rows="5" bind:value={adminBusyMessageTemplate} placeholder="Template pesan otomatis..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:border-sky-500 focus:outline-none resize-y font-mono"></textarea>
-        <span class="text-[10px] text-sky-400/80 block mt-1">Gunakan tag: <code>{{order_id}}</code> dan <code>{{jam_kirim}}</code></span>
+        <span class="text-[10px] text-sky-400/80 block mt-1">Gunakan tag: <code>&#123;&#123;order_id&#125;&#125;</code> dan <code>&#123;&#123;jam_kirim&#125;&#125;</code></span>
       </div>
     </div>
   </div>
