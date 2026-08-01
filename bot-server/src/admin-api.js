@@ -355,6 +355,7 @@ router.post('/stock/:productId', async (req, res) => {
       expiredAt,
       expDays,
       inviteEnabled,
+      inviteStockSlots,
       renewEnabled,
       maxRenew,
       renewStartDate,
@@ -363,7 +364,6 @@ router.post('/stock/:productId', async (req, res) => {
       warrantyDays,
       warrantyExpiredMessage
     } = req.body;
-    if (!itemsText) return res.status(400).json({ success: false, error: 'Text stok kosong' });
 
     const prodRef = db.collection('products').doc(req.params.productId);
     const prodDoc = await prodRef.get();
@@ -373,8 +373,8 @@ router.post('/stock/:productId', async (req, res) => {
     const targetVariantLabel = variantLabel || prodData.variants?.[0]?.label || 'Default';
 
     // Special handler for Invite Mode products (direct stock count slots)
-    if (inviteEnabled && req.body.inviteStockSlots !== undefined && req.body.inviteStockSlots !== null) {
-      const slotsCount = Math.max(0, Number(req.body.inviteStockSlots || 0));
+    if (inviteEnabled || req.body.inviteStockSlots !== undefined) {
+      const slotsCount = Math.max(0, Number(req.body.inviteStockSlots ?? inviteStockSlots ?? 0));
       const updatedVariants = (prodData.variants || []).map(v => {
         if (v.label === targetVariantLabel) {
           return {
@@ -387,8 +387,9 @@ router.post('/stock/:productId', async (req, res) => {
         }
         return v;
       });
-      await prodRef.update({ variants: updatedVariants });
-      return res.json({ success: true, addedCount: slotsCount, currentStock: slotsCount });
+      const totalStock = updatedVariants.reduce((s, v) => s + Number(v.stock || 0), 0);
+      await prodRef.update({ variants: updatedVariants, stock: totalStock });
+      return res.json({ success: true, addedCount: slotsCount, currentStock: totalStock });
     }
 
     if (!itemsText) return res.status(400).json({ success: false, error: 'Text stok kosong' });

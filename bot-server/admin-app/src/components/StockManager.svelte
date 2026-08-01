@@ -205,18 +205,19 @@
 
   async function handleAddStock() {
     if (!selectedProductId) return alert('Silakan pilih produk terlebih dahulu!');
-    if (!itemsText.trim()) return alert('Data stok tidak boleh kosong!');
+    if (!inviteEnabled && !itemsText.trim()) return alert('Data stok tidak boleh kosong!');
 
     submitStatus = '⚡ Menambahkan stok...';
     try {
       const res = await apiFetch(`/api/admin/stock/${selectedProductId}`, {
         method: 'POST',
         body: JSON.stringify({
-          itemsText: itemsText.trim(),
+          itemsText: inviteEnabled ? '' : itemsText.trim(),
           variantLabel: selectedVariantLabel,
           expiredAt: expiredAtDate || null,
           expDays: expDays || null,
           inviteEnabled,
+          inviteStockSlots,
           renewEnabled,
           maxRenew: renewScheduleDates.length > 0 ? renewScheduleDates.length : maxRenew,
           renewStartDate: renewStartDate || (renewScheduleDates[0] || ''),
@@ -232,8 +233,10 @@
       });
 
       if (res && res.success) {
-        submitStatus = `✅ Berhasil menambahkan ${res.addedCount} akun stok!`;
-        itemsText = '';
+        submitStatus = inviteEnabled 
+          ? `✅ Berhasil menyimpan ${res.addedCount} slot stok invite!`
+          : `✅ Berhasil menambahkan ${res.addedCount} akun stok!`;
+        if (!inviteEnabled) itemsText = '';
         await loadStock();
         onRefresh();
       } else {
@@ -521,89 +524,101 @@
         </button>
       </div>
 
-      <div class="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 space-y-3.5 shadow-md">
-        <div class="flex items-center justify-between">
-          <h2 class="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-            📋 4. Daftar Stok Pool ({stockItems.length} pcs)
-          </h2>
-          <button type="button" onclick={loadStock} class="text-xs text-sky-400 font-extrabold hover:underline cursor-pointer">↻ Refresh Stok</button>
+      {#if inviteEnabled}
+        <div class="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-5 shadow-md space-y-2 text-center">
+          <div class="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+            <span>✉️</span> Mode Slot Invite Email Buyer Aktif
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Varian ini menggunakan <b>Mode Slot Invite</b> (Stok Tersedia = <span class="text-emerald-400 font-extrabold">{inviteStockSlots} Pcs</span>).<br>
+            Varian Invite tidak memerlukan atau menggunakan akun email/password di daftar Stok Pool karena pelanggan akan mengisi email mereka sendiri saat memesan.
+          </p>
         </div>
+      {:else}
+        <div class="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 space-y-3.5 shadow-md">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+              📋 4. Daftar Stok Pool ({stockItems.length} pcs)
+            </h2>
+            <button type="button" onclick={loadStock} class="text-xs text-sky-400 font-extrabold hover:underline cursor-pointer">↻ Refresh Stok</button>
+          </div>
 
-        <p class="text-[11px] text-slate-400">
-          💡 <b>Status Individual ON/OFF Stok</b>: Setiap stok memiliki tombol status `[🟢 ON]` / `[🔴 OFF]` dan tombol `[✏️ Edit]` untuk meng-edit ulang data akun stok yang sudah ada.
-        </p>
+          <p class="text-[11px] text-slate-400">
+            💡 <b>Status Individual ON/OFF Stok</b>: Setiap stok memiliki tombol status `[🟢 ON]` / `[🔴 OFF]` dan tombol `[✏️ Edit]` untuk meng-edit ulang data akun stok yang sudah ada.
+          </p>
 
-        <div class="max-h-96 overflow-y-auto space-y-2 pr-1 pt-1 font-mono text-[11px]">
-          {#if loadingStock}
-            <div class="text-center py-8 text-slate-500 font-sans text-xs animate-pulse">Memuat daftar stok...</div>
-          {:else if stockItems.length === 0}
-            <div class="text-center py-8 text-slate-500 font-sans text-xs">Belum ada akun stok untuk produk ini.</div>
-          {:else}
-            {#each stockItems as item, idx}
-              <div class="flex items-center justify-between p-3 rounded-xl border transition-all gap-3 {item.isActive ? 'bg-slate-950 border-slate-800' : 'bg-rose-950/20 border-rose-900/40 opacity-75'}">
-                <div class="min-w-0 flex-1 space-y-1">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-slate-500 font-extrabold">#{idx+1}</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">{item.variantLabel || 'Default'}</span>
-                    
-                    {#if item.isInviteItem}
-                      <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✉️ Invite ON</span>
+          <div class="max-h-96 overflow-y-auto space-y-2 pr-1 pt-1 font-mono text-[11px]">
+            {#if loadingStock}
+              <div class="text-center py-8 text-slate-500 font-sans text-xs animate-pulse">Memuat daftar stok...</div>
+            {:else if stockItems.length === 0}
+              <div class="text-center py-8 text-slate-500 font-sans text-xs">Belum ada akun stok untuk produk ini.</div>
+            {:else}
+              {#each stockItems as item, idx}
+                <div class="flex items-center justify-between p-3 rounded-xl border transition-all gap-3 {item.isActive ? 'bg-slate-950 border-slate-800' : 'bg-rose-950/20 border-rose-900/40 opacity-75'}">
+                  <div class="min-w-0 flex-1 space-y-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-slate-500 font-extrabold">#{idx+1}</span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">{item.variantLabel || 'Default'}</span>
+                      
+                      {#if item.isInviteItem}
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✉️ Invite ON</span>
+                      {/if}
+
+                      <span class="px-2 py-0.5 rounded text-[10px] font-extrabold {item.isActive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
+                        {item.isActive ? '🟢 STATUS ON' : '🔴 STATUS OFF'}
+                      </span>
+                    </div>
+
+                    <div class="text-slate-200 font-semibold text-xs truncate">
+                      {escapeHTML(item.username ? `${item.username} | ${item.email || '-'} | ${item.password}` : (item.data || item.text))}
+                    </div>
+
+                    {#if item.f2aSecret || item.profile}
+                      <div class="text-[10px] text-slate-400 truncate">
+                        🔑 2FA: <span class="text-amber-300 font-bold">{item.f2aSecret || '-'}</span> | 👤 Profil: <span class="text-violet-300 font-bold">{item.profile || '-'}</span>
+                      </div>
                     {/if}
 
-                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold {item.isActive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
-                      {item.isActive ? '🟢 STATUS ON' : '🔴 STATUS OFF'}
-                    </span>
+                    {#if item.expiredAt}
+                      <div class="text-[10px] text-slate-500">
+                        📅 Expired: {new Date(item.expiredAt).toLocaleDateString('id-ID')}
+                      </div>
+                    {/if}
                   </div>
 
-                  <div class="text-slate-200 font-semibold text-xs truncate">
-                    {escapeHTML(item.username ? `${item.username} | ${item.email || '-'} | ${item.password}` : (item.data || item.text))}
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button 
+                      type="button" 
+                      onclick={() => openEditModal(item)} 
+                      class="p-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/20 text-[11px] font-bold cursor-pointer flex items-center gap-1"
+                      title="Edit Stok Ini"
+                    >
+                      ✏️ Edit
+                    </button>
+
+                    <button 
+                      type="button" 
+                      onclick={() => toggleItemActive(item.id, item.isActive)} 
+                      class="px-2.5 py-1.5 rounded-xl font-extrabold text-[10px] transition-all cursor-pointer {item.isActive ? 'bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/30' : 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30'}"
+                    >
+                      {item.isActive ? '🔴 OFF' : '🟢 ON'}
+                    </button>
+
+                    <button 
+                      type="button" 
+                      onclick={() => deleteItem(item.id)} 
+                      class="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-[11px] font-bold cursor-pointer"
+                      title="Hapus Stok"
+                    >
+                      🗑️
+                    </button>
                   </div>
-
-                  {#if item.f2aSecret || item.profile}
-                    <div class="text-[10px] text-slate-400 truncate">
-                      🔑 2FA: <span class="text-amber-300 font-bold">{item.f2aSecret || '-'}</span> | 👤 Profil: <span class="text-violet-300 font-bold">{item.profile || '-'}</span>
-                    </div>
-                  {/if}
-
-                  {#if item.expiredAt}
-                    <div class="text-[10px] text-slate-500">
-                      📅 Expired: {new Date(item.expiredAt).toLocaleDateString('id-ID')}
-                    </div>
-                  {/if}
                 </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                  <button 
-                    type="button" 
-                    onclick={() => openEditModal(item)} 
-                    class="p-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 text-sky-400 hover:text-white border border-sky-500/20 text-[11px] font-bold cursor-pointer flex items-center gap-1"
-                    title="Edit Stok Ini"
-                  >
-                    ✏️ Edit
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onclick={() => toggleItemActive(item.id, item.isActive)} 
-                    class="px-2.5 py-1.5 rounded-xl font-extrabold text-[10px] transition-all cursor-pointer {item.isActive ? 'bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/30' : 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30'}"
-                  >
-                    {item.isActive ? '🔴 OFF' : '🟢 ON'}
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onclick={() => deleteItem(item.id)} 
-                    class="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-[11px] font-bold cursor-pointer"
-                    title="Hapus Stok"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            {/each}
-          {/if}
+              {/each}
+            {/if}
+          </div>
         </div>
-      </div>
+      {/if}
 
     </div>
 
