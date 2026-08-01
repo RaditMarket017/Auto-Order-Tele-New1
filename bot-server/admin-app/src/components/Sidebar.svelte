@@ -84,6 +84,15 @@
         Voucher Promo
       </button>
 
+      <!-- Kirim Broadcast -->
+      <button
+        onclick={() => selectTab('broadcast')}
+        class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer {activeTab === 'broadcast' ? 'text-white bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg shadow-emerald-600/30 border border-emerald-400/30' : 'text-slate-400 hover:text-white hover:bg-emerald-950/40'}"
+      >
+        <svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2"/></svg>
+        Kirim Broadcast
+      </button>
+
       <!-- TMail Generator -->
       <button
         onclick={() => selectTab('tmail')}

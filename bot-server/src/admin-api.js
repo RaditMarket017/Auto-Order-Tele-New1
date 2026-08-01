@@ -880,27 +880,139 @@ router.get('/maintenance', async (req, res) => {
   }
 });
 
-router.post('/maintenance', async (req, res) => {
+// ─── BROADCAST MANAGER ───
+const { generateRestockPNG } = require('../../src/broadcast-generator');
+
+router.post('/broadcast', async (req, res) => {
   try {
-    const { isMaintenance, message } = req.body;
-    const maintenanceMode = Boolean(isMaintenance);
-    const maintenanceMessage = message || 'Bot & Shop sedang dalam pemeliharaan berkala.';
+    const {
+      variant,
+      isPng,
+      apkLogoUrl,
+      productName,
+      duration,
+      keterangan,
+      price,
+      freshBilling,
+      sendToChannel,
+      sendToUsers,
+    } = req.body;
 
-    await db.collection('settings').doc('system').set({
-      maintenanceMode,
-      maintenanceMessage,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    if (!sendToChannel && !sendToUsers) {
+      return res.status(400).json({ success: false, error: 'Pilih minimal satu target pengiriman (Channel atau User Bot)!' });
+    }
 
-    await db.collection('settings').doc('store').set({
-      maintenanceMode,
-      maintenanceMessage,
-    }, { merge: true });
+    const selectedVariant = variant || 'RESTOCK';
+    const isRestock = selectedVariant === 'RESTOCK';
+    const usePng = isRestock && Boolean(isPng);
 
-    res.json({ success: true, isMaintenance: maintenanceMode });
+    // 1. Format text message based on variant specification
+    let formattedText = '';
+    if (isRestock) {
+      if (usePng) {
+        // Caption text for PNG Restock
+        formattedText = `♻️ <b>RESTOCK TERSEDIA!</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n📌 <b>Keterangan :</b> ${keterangan || '-'}\n💰 <b>Harga :</b> ${price || '-'}\n🆕 <b>Fresh Billing :</b> ${freshBilling || '-'}`;
+      } else {
+        // Text format for RESTOCK PNG OFF
+        const linkStr = apkLogoUrl && apkLogoUrl.trim() ? `\n🔗 Link Ikon Aplikasi: ${apkLogoUrl.trim()}\n` : '';
+        formattedText = `♻️ <b>RESTOCK TERSEDIA!</b>\n${linkStr}\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n📌 <b>Keterangan :</b> ${keterangan || '-'}\n💰 <b>Harga :</b> ${price || '-'}\n🆕 <b>Fresh Billing :</b> ${freshBilling || '-'}`;
+      }
+    } else if (selectedVariant === 'PERUBAHAN_HARGA') {
+      formattedText = `📢 <b>PERUBAHAN HARGA</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n💰 <b>Harga Baru :</b> ${price || '-'}\n\n📌 <i>Catatan:</i>\nHarga telah diperbarui, silakan cek sebelum order.`;
+    } else if (selectedVariant === 'DISKON') {
+      formattedText = `🔥 <b>PROMO SPESIAL!</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n💰 <b>Harga Promo :</b> ${price || '-'}\n\n⚡ <i>Promo terbatas, segera order!</i>`;
+    } else if (selectedVariant === 'INFO_PENTING') {
+      formattedText = `📢 <b>INFORMASI PENTING</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n\n📌 <b>Detail:</b>\n${keterangan || '-'}\n\n<i>Mohon diperhatikan sebelum transaksi.</i>`;
+    }
+
+    // 2. Generate PNG buffer if RESTOCK + PNG ON
+    let pngBuffer = null;
+    if (usePng) {
+      pngBuffer = await generateRestockPNG({
+        apkLogoUrl,
+        productName,
+        duration,
+        keterangan,
+        price,
+        freshBilling,
+      });
+    }
+
+    // Initialize Telegraf bot
+    const { Telegraf } = require('telegraf');
+    const token = config.BOT_TOKEN || process.env.BOT_TOKEN;
+    if (!token) {
+      return res.status(500).json({ success: false, error: 'BOT_TOKEN tidak dikonfigurasi!' });
+    }
+    const bot = new Telegraf(token);
+
+    let channelSent = false;
+    let userSentCount = 0;
+    let userFailedCount = 0;
+
+    // 3. Send to Channel if enabled
+    if (sendToChannel) {
+      try {
+        const sysDoc = await db.collection('settings').doc('system').get();
+        const storeDoc = await db.collection('settings').doc('store').get();
+        const sysData = sysDoc.exists ? sysDoc.data() : {};
+        const storeData = storeDoc.exists ? storeDoc.data() : {};
+        const targetChannelId = sysData.requiredChannelId || storeData.requiredChannelId || config.REQUIRED_CHANNEL_ID || config.TESTIMONI_CHANNEL_ID;
+
+        if (targetChannelId) {
+          if (usePng && pngBuffer) {
+            await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+          } else {
+            await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
+          }
+          channelSent = true;
+        }
+      } catch (err) {
+        console.error('Broadcast Channel Error:', err);
+      }
+    }
+
+    // 4. Send to Users if enabled
+    if (sendToUsers) {
+      try {
+        const usersSnap = await db.collection('bot_users').get();
+        const userDocs = usersSnap.docs;
+
+        for (const doc of userDocs) {
+          const userId = doc.id;
+          if (!userId) continue;
+
+          try {
+            if (usePng && pngBuffer) {
+              await bot.telegram.sendPhoto(userId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+            } else {
+              await bot.telegram.sendMessage(userId, formattedText, { parse_mode: 'HTML' });
+            }
+            userSentCount++;
+            // Small delay to avoid rate limits
+            await new Promise(r => setTimeout(r, 40));
+          } catch (uErr) {
+            userFailedCount++;
+          }
+        }
+      } catch (err) {
+        console.error('Broadcast Users Error:', err);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        channelSent,
+        userSentCount,
+        userFailedCount,
+      }
+    });
   } catch (err) {
+    console.error('Broadcast endpoint error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 module.exports = router;
+

@@ -14,6 +14,7 @@
   import ProductModal from './components/modals/ProductModal.svelte';
   import VoucherModal from './components/modals/VoucherModal.svelte';
   import StockManager from './components/StockManager.svelte';
+  import Broadcast from './components/Broadcast.svelte';
 
   let activeTab = $state('overview');
   let sidebarOpen = $state(false);
@@ -131,6 +132,8 @@
       <Orders {orders} onRefresh={loadOrders} />
     {:else if activeTab === 'vouchers'}
       <Vouchers {vouchers} onOpenAddModal={openAddVoucherModal} onRefresh={loadVouchers} />
+    {:else if activeTab === 'broadcast'}
+      <Broadcast />
     {:else if activeTab === 'tmail'}
       <TMail />
     {:else if activeTab === 'settings'}
