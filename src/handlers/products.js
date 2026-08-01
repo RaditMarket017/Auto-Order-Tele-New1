@@ -203,7 +203,7 @@ async function showProductDetail(ctx, productId) {
     const buttons = [];
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
-      const stock = isReqEmail
+      const stock = (isReqEmail || v.inviteEnabled)
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
         : (stockByVariant[v.label] || 0);
       const btnTitle = (v.label || '').split('\n')[0].trim();

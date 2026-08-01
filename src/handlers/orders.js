@@ -34,7 +34,7 @@ async function showOrderSummary(ctx, productId, variantIndex) {
       .where('isUsed', '==', false)
       .get();
 
-    const availableStock = Boolean(product.requiresEmail)
+    const availableStock = (Boolean(product.requiresEmail) || Boolean(variant.inviteEnabled))
       ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
       : poolSnap.size;
     if (availableStock <= 0) {

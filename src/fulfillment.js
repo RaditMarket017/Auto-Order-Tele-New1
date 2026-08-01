@@ -90,7 +90,13 @@ async function fulfillOrder(orderId) {
     if (!isRequiresEmail && order.productId) {
       try {
         const pDoc = await db.collection('products').doc(order.productId).get();
-        if (pDoc.exists) isRequiresEmail = Boolean(pDoc.data()?.requiresEmail);
+        if (pDoc.exists) {
+          const pData = pDoc.data();
+          const variants = pData.variants || [];
+          const vIdx = order.variantIndex !== undefined ? order.variantIndex : variants.findIndex(v => v.label === order.variantLabel);
+          const vObj = (vIdx >= 0 && variants[vIdx]) ? variants[vIdx] : variants[0];
+          isRequiresEmail = Boolean(pData.requiresEmail || vObj?.inviteEnabled);
+        }
       } catch (e) {}
     }
 
