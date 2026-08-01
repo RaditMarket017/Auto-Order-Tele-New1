@@ -64,7 +64,7 @@ async function showProductList(ctx, page = 0, isEdit = false) {
 
     for (let i = 0; i < pageProducts.length; i++) {
       const p = pageProducts[i];
-      const isReqEmail = Boolean(p.requiresEmail);
+      const isReqEmail = Boolean(p.requiresEmail || (p.variants || []).some(v => v.inviteEnabled));
       const totalStock = isReqEmail
         ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
         : (stockMap[p.id] || 0);
@@ -163,7 +163,7 @@ async function showProductDetail(ctx, productId) {
     // Add variant list with price and stock per variant
     for (const v of variants) {
       const price = await getProductPrice(v, userId);
-      const vStock = isReqEmail
+      const vStock = (isReqEmail || v.inviteEnabled)
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
         : (stockByVariant[v.label] || 0);
       const stockBadge = vStock > 0 ? `🟢 <b>${vStock}</b>` : `🔴 <b>0 (Habis)</b>`;

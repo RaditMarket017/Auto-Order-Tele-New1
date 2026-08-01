@@ -215,7 +215,8 @@ async function listProducts(ctx) {
 
   snap.docs.forEach((doc, i) => {
     const p = doc.data();
-    const stock = Boolean(p.requiresEmail)
+    const isReqEmail = Boolean(p.requiresEmail || (p.variants || []).some(v => v.inviteEnabled));
+    const stock = isReqEmail
       ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
       : (stockMap[doc.id] || 0);
     msg += `<b>${i + 1}. ${escapeHTML(p.name).toUpperCase()}</b> - (<b>${stock}</b> stok)\n`;
@@ -250,7 +251,10 @@ async function showEditProduct(ctx, productId) {
     stockByVariant[vl] = (stockByVariant[vl] || 0) + 1;
   });
 
-  const totalStock = poolSnap.size || p.stock || 0;
+  const isReqEmail = Boolean(p.requiresEmail || (p.variants || []).some(v => v.inviteEnabled));
+  const totalStock = isReqEmail
+    ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
+    : (poolSnap.size || p.stock || 0);
 
   let msg = `<b>✏ EDIT: ${escapeHTML(p.name)}</b>\n────────────────────────────\n\n`;
   msg += `• <b>Harga Base</b>: ${formatIDR(p.basePrice || 0)}\n`;
@@ -260,7 +264,9 @@ async function showEditProduct(ctx, productId) {
   msg += `• <b>APK Logo</b>: ${p.apkLogoUrl ? 'Set ✅' : 'Belum ❌'}\n\n`;
   msg += `<b>👇 Varian & Stok:</b>\n`;
   (p.variants || []).forEach(v => {
-    const vStock = stockByVariant[v.label] ?? v.stock ?? 0;
+    const vStock = (p.requiresEmail || v.inviteEnabled)
+      ? Number(v.stock || 0)
+      : (stockByVariant[v.label] ?? v.stock ?? 0);
     msg += `• ${escapeHTML(v.label)} — ${formatIDR(v.price)} (Stok: <b>${vStock}</b> pcs)\n`;
   });
 

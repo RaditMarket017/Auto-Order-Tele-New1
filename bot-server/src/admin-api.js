@@ -186,7 +186,7 @@ router.get('/products', async (req, res) => {
 
       const variants = (pData.variants || []).map(v => {
         let vStock;
-        if (reqEmail) {
+        if (reqEmail || v.inviteEnabled) {
           vStock = (v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0;
         } else {
           vStock = stockMap[pId]?.[v.label] || 0;
