@@ -609,83 +609,16 @@ function registerWarrantyRenewHandlers(bot) {
     return safeEditMessage(ctx, msg, keyboard);
   });
 
-  // User starts uploading photo proof
-  bot.action(/^start_upload_photos_(.+)$/, async (ctx) => {
-    const orderId = ctx.match[1];
-    ctx.answerCbQuery().catch(() => {});
-
-    const userId = ctx.from.id;
-    const storeSettings = await getStoreSettings();
-    const uploadTimeoutMins = Number(storeSettings.warrantyUploadTimeoutMinutes || 5);
-    const nowMs = Date.now();
-    const uploadDeadlineAt = nowMs + (uploadTimeoutMins * 60 * 1000);
-
-    const session = userWarrantySessions.get(userId) || { orderId, issueType: 'Kendala', photos: [] };
-    session.awaitingPhotos = true;
-    session.promptMsgId = ctx.callbackQuery?.message?.message_id;
-    session.uploadDeadlineAt = uploadDeadlineAt;
-    session.uploadTimeoutMins = uploadTimeoutMins;
-    userWarrantySessions.set(userId, session);
-
-    try {
-      await db.collection('orders').doc(orderId).update({
-        warrantyClaimStatus: 'pending_proof',
-        claimStartedAt: new Date(nowMs).toISOString(),
-        uploadDeadlineAt: new Date(uploadDeadlineAt).toISOString(),
-      });
-    } catch (e) {}
-
-    const msg =
-      `<b>📸 SILAKAN KIRIM FOTO BUKTI KENDALA</b>\n` +
-      `────────────────────────────\n` +
-      `Silakan kirimkan 1 s/d 5 foto screenshot kendala Anda langsung ke bot ini.\n\n` +
-      `⏳ <b>Batas Waktu Unggah Bukti:</b> <b>${uploadTimeoutMins} Menit</b>\n` +
-      `⚠️ <i>Jika melebihi batas waktu ${uploadTimeoutMins} menit, klaim garansi Anda akan hangus secara otomatis.</i>\n\n` +
-      `• Foto Terkumpul: <b>${session.photos.length}/5</b>\n\n` +
-      `<i>Setelah selesai mengirim foto, tekan tombol <b>"✅ Selesai Upload Bukti"</b> di bawah.</i>`;
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('✅ Selesai Upload Bukti', `finish_warranty_claim_${orderId}`)],
-      [Markup.button.callback('✕ Batal', `cancel_warranty_user_${orderId}`)],
-    ]);
-
-    return safeEditMessage(ctx, msg, keyboard);
-  });
-
-  // User finishes photo upload & submits claim
-  bot.action(/^finish_warranty_claim_(.+)$/, async (ctx) => {
-    const orderId = ctx.match[1];
-    const userId = ctx.from.id;
-    const session = userWarrantySessions.get(userId);
-
-    if (!session || session.photos.length === 0) {
-      return ctx.answerCbQuery('⚠️ Harap kirimkan minimal 1 foto bukti kendala terlebih dahulu!', { show_alert: true });
+  async function submitWarrantyClaim(userId, orderId, session, isAutoSubmit = false) {
+    if (session.timer) {
+      clearTimeout(session.timer);
+      session.timer = null;
     }
-
-    const nowMs = Date.now();
-    if (session.uploadDeadlineAt && nowMs > session.uploadDeadlineAt) {
-      userWarrantySessions.delete(userId);
-      try {
-        await db.collection('orders').doc(orderId).update({
-          warrantyClaimed: true,
-          warrantyClaimStatus: 'expired_timeout',
-          lastWarrantyStatus: 'expired_timeout',
-        });
-      } catch (e) {}
-      ctx.answerCbQuery(`⚠️ Batas waktu pengiriman bukti (${session.uploadTimeoutMins || 5} menit) telah habis. Klaim garansi hangus.`, { show_alert: true });
-      return safeEditMessage(ctx,
-        `<b>⚠️ KLAIM GARANSI HANGUS (TIMEOUT)</b>\n` +
-        `────────────────────────────\n` +
-        `Batas waktu pengiriman bukti garansi telah habis. Klaim garansi Anda untuk order <code>${escapeHTML(orderId)}</code> telah hangus.`
-      );
-    }
-
-    ctx.answerCbQuery('✅ Laporan Garansi Terkirim!').catch(() => {});
     userWarrantySessions.delete(userId);
 
     try {
       const doc = await db.collection('orders').doc(orderId).get();
-      if (!doc.exists) return ctx.reply('❌ Order tidak ditemukan.');
+      if (!doc.exists) return;
       const order = { id: doc.id, ...doc.data() };
 
       const { dateStr, timeStr } = formatDateID(new Date());
@@ -693,16 +626,17 @@ function registerWarrantyRenewHandlers(bot) {
 
       const claimData = {
         claimId: `CLM-${Date.now()}`,
-        issueType: session.issueType,
-        photos: session.photos,
+        issueType: session.issueType || 'Kendala',
+        photos: session.photos || [],
         status: 'pending',
         createdAt: new Date().toISOString(),
         jamKirim,
+        autoSubmitted: isAutoSubmit,
       };
 
       const existingClaims = order.warrantyClaims || [];
       await doc.ref.update({
-        warrantyClaimed: true, // Mark claimed so button disappears!
+        warrantyClaimed: true,
         warrantyClaimStatus: 'pending_admin',
         proofReceivedAt: jamKirim,
         proofReceivedTimestamp: Date.now(),
@@ -711,23 +645,28 @@ function registerWarrantyRenewHandlers(bot) {
         lastWarrantyStatus: 'pending',
       });
 
-      await safeEditMessage(ctx,
-        `<b>✅ LAPORAN GARANSI TERSAMPAIKAN</b>\n` +
+      const userMsg =
+        `<b>✅ LAPORAN GARANSI TERSAMPAIKAN${isAutoSubmit ? ' (OTOMATIS)' : ''}</b>\n` +
         `────────────────────────────\n` +
-        `Laporan kendala (<b>${escapeHTML(session.issueType)}</b>) beserta ${session.photos.length} foto bukti untuk order <code>${escapeHTML(orderId)}</code> telah dikirimkan ke Admin.\n\n` +
-        `🕒 <i>Bukti Anda telah diterima pada <b>${jamKirim}</b>.</i>\n` +
-        `<i>Admin akan meninjau laporan dan memberikan respon / akun pengganti secepatnya.</i>`
-      );
+        `Laporan kendala (<b>${escapeHTML(session.issueType || 'Kendala')}</b>) beserta ${session.photos.length} foto bukti untuk order <code>${escapeHTML(orderId)}</code> telah dikirimkan ke Admin.\n\n` +
+        `🕒 <i>Bukti Anda telah diterima pada <b>${jamKirim}</b>.${isAutoSubmit ? ' (Otomatis terkirim setelah 5 menit)' : ''}</i>\n` +
+        `<i>Admin akan meninjau laporan dan memberikan respon / akun pengganti secepatnya.</i>`;
+
+      if (session.promptMsgId) {
+        await bot.telegram.editMessageText(userId, session.promptMsgId, null, userMsg, { parse_mode: 'HTML' }).catch(() => {});
+      } else {
+        await bot.telegram.sendMessage(userId, userMsg, { parse_mode: 'HTML' }).catch(() => {});
+      }
 
       // Forward to Admin
       if (config.ADMIN_ID) {
         const adminMsg =
-          `<b>🛡️ LAPORAN KLAIM GARANSI BARU</b>\n` +
+          `<b>🛡️ LAPORAN KLAIM GARANSI BARU${isAutoSubmit ? ' (Auto-Submit)' : ''}</b>\n` +
           `────────────────────────────\n` +
           `• <b>Customer</b>   : <b>${escapeHTML(order.customerName || 'User')}</b> (<code>${order.telegramUserId}</code>)\n` +
           `• <b>Produk</b>     : <b>${escapeHTML(order.productName)}</b> (${escapeHTML(order.variantLabel)})\n` +
           `• <b>Order ID</b>   : <code>${escapeHTML(order.id)}</code>\n` +
-          `• <b>Kendala</b>    : <b>${escapeHTML(session.issueType)}</b>\n` +
+          `• <b>Kendala</b>    : <b>${escapeHTML(session.issueType || 'Kendala')}</b>\n` +
           `• <b>Jml Bukti</b>  : <b>${session.photos.length} Foto</b>\n` +
           `• <b>Diterima</b>   : <b>${jamKirim}</b>\n` +
           `────────────────────────────\n` +
@@ -754,8 +693,95 @@ function registerWarrantyRenewHandlers(bot) {
         }
       }
     } catch (err) {
-      console.error('finish_warranty_claim error:', err);
+      console.error('submitWarrantyClaim error:', err);
     }
+  }
+
+  // User starts uploading photo proof
+  bot.action(/^start_upload_photos_(.+)$/, async (ctx) => {
+    const orderId = ctx.match[1];
+    ctx.answerCbQuery().catch(() => {});
+
+    const userId = ctx.from.id;
+    const storeSettings = await getStoreSettings();
+    const uploadTimeoutMins = Number(storeSettings.warrantyUploadTimeoutMinutes || 5);
+    const nowMs = Date.now();
+    const uploadDeadlineAt = nowMs + (uploadTimeoutMins * 60 * 1000);
+
+    const session = userWarrantySessions.get(userId) || { orderId, issueType: 'Kendala', photos: [] };
+    if (session.timer) clearTimeout(session.timer);
+
+    session.awaitingPhotos = true;
+    session.promptMsgId = ctx.callbackQuery?.message?.message_id;
+    session.uploadDeadlineAt = uploadDeadlineAt;
+    session.uploadTimeoutMins = uploadTimeoutMins;
+
+    // Background timer to auto-submit uploaded photos or expire session
+    session.timer = setTimeout(async () => {
+      const activeSession = userWarrantySessions.get(userId);
+      if (!activeSession || activeSession.orderId !== orderId) return;
+
+      if (activeSession.photos && activeSession.photos.length > 0) {
+        await submitWarrantyClaim(userId, orderId, activeSession, true);
+      } else {
+        userWarrantySessions.delete(userId);
+        try {
+          await db.collection('orders').doc(orderId).update({
+            warrantyClaimed: true,
+            warrantyClaimStatus: 'expired_timeout',
+            lastWarrantyStatus: 'expired_timeout',
+          });
+        } catch (e) {}
+
+        const msgTimeout =
+          `<b>⚠️ KLAIM GARANSI HANGUS (TIMEOUT)</b>\n` +
+          `────────────────────────────\n` +
+          `Batas waktu pengiriman bukti garansi (${uploadTimeoutMins} menit) telah habis.\n` +
+          `Klaim garansi untuk order <code>${escapeHTML(orderId)}</code> hangus.`;
+
+        bot.telegram.sendMessage(userId, msgTimeout, { parse_mode: 'HTML' }).catch(() => {});
+      }
+    }, uploadTimeoutMins * 60 * 1000);
+
+    userWarrantySessions.set(userId, session);
+
+    try {
+      await db.collection('orders').doc(orderId).update({
+        warrantyClaimStatus: 'pending_proof',
+        claimStartedAt: new Date(nowMs).toISOString(),
+        uploadDeadlineAt: new Date(uploadDeadlineAt).toISOString(),
+      });
+    } catch (e) {}
+
+    const msg =
+      `<b>📸 SILAKAN KIRIM FOTO BUKTI KENDALA</b>\n` +
+      `────────────────────────────\n` +
+      `Silakan kirimkan 1 s/d 5 foto screenshot kendala Anda langsung ke bot ini.\n\n` +
+      `⏳ <b>Batas Waktu Unggah Bukti:</b> <b>${uploadTimeoutMins} Menit</b>\n` +
+      `⚠️ <i>Jika melebihi batas waktu ${uploadTimeoutMins} menit, klaim garansi Anda akan di-submit secara otomatis dari foto yang terkumpul.</i>\n\n` +
+      `• Foto Terkumpul: <b>${session.photos.length}/5</b>\n\n` +
+      `<i>Setelah selesai mengirim foto, tekan tombol <b>"✅ Selesai Upload Bukti"</b> di bawah.</i>`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('✅ Selesai Upload Bukti', `finish_warranty_claim_${orderId}`)],
+      [Markup.button.callback('✕ Batal', `cancel_warranty_user_${orderId}`)],
+    ]);
+
+    return safeEditMessage(ctx, msg, keyboard);
+  });
+
+  // User finishes photo upload & submits claim
+  bot.action(/^finish_warranty_claim_(.+)$/, async (ctx) => {
+    const orderId = ctx.match[1];
+    const userId = ctx.from.id;
+    const session = userWarrantySessions.get(userId);
+
+    if (!session || session.photos.length === 0) {
+      return ctx.answerCbQuery('⚠️ Harap kirimkan minimal 1 foto bukti kendala terlebih dahulu!', { show_alert: true });
+    }
+
+    ctx.answerCbQuery('✅ Laporan Garansi Terkirim!').catch(() => {});
+    await submitWarrantyClaim(userId, orderId, session, false);
   });
 
   // Admin clicks "Ganti Akun" for Warranty

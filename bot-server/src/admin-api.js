@@ -821,7 +821,7 @@ router.delete('/vouchers/:id', async (req, res) => {
 // ─── TMAIL API ───
 router.get('/tmail/generate', async (req, res) => {
   try {
-    const emailData = generateTempEmail();
+    const emailData = await generateTempEmail();
     res.json({ success: true, data: emailData });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -830,10 +830,11 @@ router.get('/tmail/generate', async (req, res) => {
 
 router.get('/tmail/inbox', async (req, res) => {
   try {
-    const { login, domain } = req.query;
-    if (!login || !domain) return res.status(400).json({ success: false, error: 'Login and domain required' });
+    const { email, login, domain } = req.query;
+    const targetEmail = email || (login && domain ? `${login}@${domain}` : login);
+    if (!targetEmail) return res.status(400).json({ success: false, error: 'Email or login/domain required' });
 
-    const messages = await checkInbox(login, domain);
+    const messages = await checkInbox(targetEmail, domain);
     res.json({ success: true, data: messages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -842,10 +843,11 @@ router.get('/tmail/inbox', async (req, res) => {
 
 router.get('/tmail/message', async (req, res) => {
   try {
-    const { login, domain, id } = req.query;
-    if (!login || !domain || !id) return res.status(400).json({ success: false, error: 'Missing params' });
+    const { email, login, domain, id } = req.query;
+    const targetEmail = email || (login && domain ? `${login}@${domain}` : login);
+    if (!targetEmail || !id) return res.status(400).json({ success: false, error: 'Missing params' });
 
-    const message = await readMessage(login, domain, parseInt(id));
+    const message = await readMessage(targetEmail, domain || id, id);
     res.json({ success: true, data: message });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -920,6 +922,37 @@ router.get('/maintenance', async (req, res) => {
 // ─── BROADCAST MANAGER ───
 const { generateRestockPNG } = require('../../src/broadcast-generator');
 
+function getMediaType(url, explicitType) {
+  if (explicitType && explicitType !== 'auto') return explicitType;
+  if (!url) return 'none';
+  const cleanUrl = url.toLowerCase().split('?')[0];
+  if (cleanUrl.match(/\.(mp4|webm|mov|mkv|avi)$/)) return 'video';
+  if (cleanUrl.match(/\.(jpg|jpeg|png|webp|gif)$/)) return 'photo';
+  if (cleanUrl.match(/\.(pdf|zip|rar|doc|docx|txt|apk)$/)) return 'document';
+  return 'photo';
+}
+
+async function sendBroadcastPayload(bot, targetId, { formattedText, pngBuffer, mediaUrl, mediaType }) {
+  if (pngBuffer) {
+    return await bot.telegram.sendPhoto(targetId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
+  }
+
+  if (mediaUrl && mediaUrl.trim()) {
+    const cleanUrl = mediaUrl.trim();
+    const type = getMediaType(cleanUrl, mediaType);
+
+    if (type === 'video') {
+      return await bot.telegram.sendVideo(targetId, cleanUrl, { caption: formattedText, parse_mode: 'HTML' });
+    } else if (type === 'document') {
+      return await bot.telegram.sendDocument(targetId, cleanUrl, { caption: formattedText, parse_mode: 'HTML' });
+    } else {
+      return await bot.telegram.sendPhoto(targetId, cleanUrl, { caption: formattedText, parse_mode: 'HTML' });
+    }
+  }
+
+  return await bot.telegram.sendMessage(targetId, formattedText, { parse_mode: 'HTML' });
+}
+
 router.post('/broadcast', async (req, res) => {
   try {
     const {
@@ -931,6 +964,8 @@ router.post('/broadcast', async (req, res) => {
       keterangan,
       price,
       freshBilling,
+      mediaUrl,
+      mediaType,
       sendToChannel,
       sendToUsers,
     } = req.body;
@@ -1003,7 +1038,6 @@ router.post('/broadcast', async (req, res) => {
     // 3. Send to Channel if enabled
     let channelError = null;
 
-    // 3. Send to Channel if enabled
     if (sendToChannel) {
       try {
         const targetChannelId = sysData.requiredChannelId 
@@ -1023,11 +1057,7 @@ router.post('/broadcast', async (req, res) => {
             });
           }
         } else {
-          if (usePng && pngBuffer) {
-            await bot.telegram.sendPhoto(targetChannelId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
-          } else {
-            await bot.telegram.sendMessage(targetChannelId, formattedText, { parse_mode: 'HTML' });
-          }
+          await sendBroadcastPayload(bot, targetChannelId, { formattedText, pngBuffer, mediaUrl, mediaType });
           channelSent = true;
         }
       } catch (err) {
@@ -1050,11 +1080,7 @@ router.post('/broadcast', async (req, res) => {
           if (!userId) continue;
 
           try {
-            if (usePng && pngBuffer) {
-              await bot.telegram.sendPhoto(userId, { source: pngBuffer, filename: 'restock.png' }, { caption: formattedText, parse_mode: 'HTML' });
-            } else {
-              await bot.telegram.sendMessage(userId, formattedText, { parse_mode: 'HTML' });
-            }
+            await sendBroadcastPayload(bot, userId, { formattedText, pngBuffer, mediaUrl, mediaType });
             userSentCount++;
             // Small delay to avoid rate limits
             await new Promise(r => setTimeout(r, 40));

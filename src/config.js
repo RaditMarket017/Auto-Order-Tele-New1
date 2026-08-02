@@ -13,6 +13,10 @@ module.exports = {
   PANZZPAY_API_KEY: process.env.PANZZPAY_API_KEY || process.env.RAMASHOP_API_KEY,
   PANZZPAY_BASE_URL: process.env.PANZZPAY_BASE_URL || 'https://panzzpay.my.id',
 
+  // TMail Generator (Premur.shop API)
+  TMAIL_BASE_URL: process.env.TMAIL_BASE_URL || 'https://mails.premur.shop',
+  TMAIL_API_KEY: process.env.TMAIL_API_KEY || '',
+
   // Firebase
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
 

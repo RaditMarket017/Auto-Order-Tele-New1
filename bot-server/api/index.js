@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const config = require('../../src/config');
 
-const shopApi = require('../src/shop-api');
 const adminApi = require('../src/admin-api');
 
 function setupServer(app) {
@@ -23,7 +22,6 @@ function setupServer(app) {
   });
 
   // API Routes
-  app.use('/api/shop', shopApi);
   app.use('/api/admin', adminApi);
 
   // Serve Admin Web App (Svelte dist)
@@ -40,23 +38,6 @@ function setupServer(app) {
       res.sendFile(path.join(adminDist, 'index.html'));
     } else {
       res.sendFile(path.join(adminLegacy, 'index.html'));
-    }
-  });
-
-  // Serve Shop Mini App (Svelte dist)
-  const shopDist = path.join(__dirname, '..', 'shop-app', 'dist');
-  const shopSource = path.join(__dirname, '..', 'shop-app');
-
-  if (fs.existsSync(shopDist)) {
-    app.use('/app', express.static(shopDist));
-  }
-  app.use('/app', express.static(shopSource));
-
-  app.get('/app*', (req, res) => {
-    if (fs.existsSync(path.join(shopDist, 'index.html'))) {
-      res.sendFile(path.join(shopDist, 'index.html'));
-    } else {
-      res.sendFile(path.join(shopSource, 'index.html'));
     }
   });
 

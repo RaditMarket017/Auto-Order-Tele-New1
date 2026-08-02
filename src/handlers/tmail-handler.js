@@ -65,28 +65,33 @@ async function handleTMailAction(ctx) {
   const lang = await getUserLang(ctx.from.id);
 
   if (action === 'tmail_generate') {
-    const emailData = generateTempEmail();
+    try {
+      const emailData = await generateTempEmail();
 
-    // Save to session
-    await db.collection('admin_tmail_sessions').doc(ctx.from.id.toString()).set({
-      email: emailData.email,
-      login: emailData.login,
-      domain: emailData.domain,
-      createdAt: new Date().toISOString(),
-    });
+      // Save to session
+      await db.collection('admin_tmail_sessions').doc(ctx.from.id.toString()).set({
+        email: emailData.email,
+        login: emailData.login,
+        domain: emailData.domain,
+        createdAt: new Date().toISOString(),
+      });
 
-    const msg = t(lang, 'tmail_generated', {
-      email: escapeHTML(emailData.email),
-      expiry: '60',
-    });
+      const msg = t(lang, 'tmail_generated', {
+        email: escapeHTML(emailData.email),
+        expiry: '60',
+      });
 
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('📥 Cek Inbox', 'tmail_inbox')],
-      [Markup.button.callback(t(lang, 'btn_back'), 'tmail_menu')],
-    ]);
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('📥 Cek Inbox', 'tmail_inbox')],
+        [Markup.button.callback(t(lang, 'btn_back'), 'tmail_menu')],
+      ]);
 
-    ctx.answerCbQuery('✅ Email dibuat!').catch(() => {});
-    return ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+      ctx.answerCbQuery('✅ Email dibuat!').catch(() => {});
+      return ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    } catch (err) {
+      ctx.answerCbQuery('❌ Gagal membuat email: ' + (err.message || 'Error'), { show_alert: true }).catch(() => {});
+      return;
+    }
   }
 
   if (action === 'tmail_inbox') {
@@ -95,10 +100,10 @@ async function handleTMailAction(ctx) {
       return ctx.answerCbQuery(t(lang, 'tmail_no_active'), { show_alert: true }).catch(() => {});
     }
 
-    const { login, domain } = sessionDoc.data();
+    const session = sessionDoc.data();
     ctx.answerCbQuery('⏳ Memuat inbox...').catch(() => {});
 
-    const messages = await checkInbox(login, domain);
+    const messages = await checkInbox(session.email || session.login, session.domain);
 
     let msg = t(lang, 'tmail_inbox_title', { count: messages.length });
 
@@ -108,7 +113,7 @@ async function handleTMailAction(ctx) {
       messages.slice(0, 10).forEach((m, i) => {
         msg += t(lang, 'tmail_inbox_item', {
           num: i + 1,
-          from: escapeHTML(m.from),
+          from: escapeHTML(m.from || 'Unknown'),
           subject: escapeHTML(m.subject || '(no subject)'),
           time: escapeHTML(m.date || ''),
         });
@@ -127,12 +132,12 @@ async function handleTMailAction(ctx) {
   }
 
   if (action.startsWith('tmail_read_')) {
-    const messageId = parseInt(action.replace('tmail_read_', ''));
+    const messageId = action.replace('tmail_read_', '');
     const sessionDoc = await db.collection('admin_tmail_sessions').doc(ctx.from.id.toString()).get();
     if (!sessionDoc.exists) return;
 
-    const { login, domain } = sessionDoc.data();
-    const message = await readMessage(login, domain, messageId);
+    const session = sessionDoc.data();
+    const message = await readMessage(session.email || session.login, session.domain || messageId, messageId);
 
     if (!message) {
       return ctx.answerCbQuery('Pesan tidak ditemukan.', { show_alert: true }).catch(() => {});

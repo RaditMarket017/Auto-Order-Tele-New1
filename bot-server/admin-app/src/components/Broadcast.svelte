@@ -9,6 +9,8 @@
   let keterangan = $state('');
   let price = $state('');
   let freshBilling = $state('');
+  let mediaUrl = $state('');
+  let mediaType = $state('auto');
 
   let sendToChannel = $state(true);
   let sendToUsers = $state(true);
@@ -75,6 +77,8 @@
           keterangan,
           price,
           freshBilling,
+          mediaUrl,
+          mediaType,
           sendToChannel,
           sendToUsers,
         }),

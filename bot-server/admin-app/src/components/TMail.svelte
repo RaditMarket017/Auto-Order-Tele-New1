@@ -13,7 +13,7 @@
 
   async function checkTMailInbox() {
     if (!activeTMail) return alert('Generate email terlebih dahulu!');
-    const res = await apiFetch(`/api/admin/tmail/inbox?login=${activeTMail.login}&domain=${activeTMail.domain}`);
+    const res = await apiFetch(`/api/admin/tmail/inbox?email=${encodeURIComponent(activeTMail.email)}&login=${activeTMail.login}&domain=${activeTMail.domain}`);
     if (!res.success) return;
     inbox = res.data || [];
   }
@@ -43,10 +43,17 @@
     {:else}
       <div class="space-y-2">
         {#each inbox as m}
-          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
-            <div class="text-xs font-bold text-sky-400">From: {m.from}</div>
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80 space-y-1.5">
+            <div class="flex items-center justify-between gap-2 flex-wrap text-xs">
+              <span class="font-bold text-sky-400">From: {m.from || 'Unknown'}</span>
+              <span class="text-[10px] text-slate-500">{m.date || ''}</span>
+            </div>
             <div class="text-xs font-semibold text-white">Subject: {m.subject || '(no subject)'}</div>
-            <div class="text-[10px] text-slate-500">{m.date}</div>
+            {#if m.body}
+              <div class="text-xs text-slate-300 bg-slate-900/90 p-2.5 rounded-lg font-mono whitespace-pre-wrap border border-slate-800/60 max-h-48 overflow-y-auto">
+                {m.body}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>

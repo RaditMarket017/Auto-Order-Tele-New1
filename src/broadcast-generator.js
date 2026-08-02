@@ -1,6 +1,7 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 /**
  * Generate RESTOCK PNG image using restock.jpg template
@@ -11,19 +12,20 @@ async function generateRestockPNG(data = {}) {
     throw new Error('Template restock.jpg tidak ditemukan!');
   }
 
-  const bgImg = await loadImage(templatePath);
+  // Load base template as buffer
+  const bgImg = await loadImage(fs.readFileSync(templatePath));
   const canvas = createCanvas(bgImg.width, bgImg.height);
   const ctx = canvas.getContext('2d');
 
   // Draw base template image
   ctx.drawImage(bgImg, 0, 0);
 
-  // 1. Render APK Logo inside top-center frame (fitted for updated restock.jpg template)
-  const frameX = 362;
-  const frameY = 180;
-  const frameW = 514;
-  const frameH = 434;
-  const r = 30;
+  // 1. Render APK Logo inside top-center frame box (exact coordinates for restock.jpg 1254x1254)
+  const frameX = 364;
+  const frameY = 181;
+  const frameW = 511;
+  const frameH = 488;
+  const r = 38;
 
   ctx.save();
   ctx.beginPath();
@@ -42,8 +44,14 @@ async function generateRestockPNG(data = {}) {
   let logoLoaded = false;
   if (data.apkLogoUrl && data.apkLogoUrl.trim().length > 0) {
     try {
-      const logoImg = await loadImage(data.apkLogoUrl.trim());
-      // Maintain 1:1 aspect ratio centered inside the frame
+      let logoSource = data.apkLogoUrl.trim();
+      if (logoSource.startsWith('http://') || logoSource.startsWith('https://')) {
+        const resp = await axios.get(logoSource, { responseType: 'arraybuffer', timeout: 12000 });
+        logoSource = Buffer.from(resp.data);
+      }
+      const logoImg = await loadImage(logoSource);
+
+      // Maintain aspect ratio centered inside the frame box
       const imgAspect = (logoImg.width && logoImg.height) ? (logoImg.width / logoImg.height) : 1;
       let drawW = frameW;
       let drawH = frameH;
@@ -85,23 +93,22 @@ async function generateRestockPNG(data = {}) {
   }
   ctx.restore();
 
-  // 2. Render Text Fields into boxes
+  // 2. Render Text Fields into 5 rows
   const fields = [
-    { key: 'productName', val: (data.productName || '-').toString().toUpperCase(), centerY: 749 },
-    { key: 'duration', val: (data.duration || '-').toString().toUpperCase(), centerY: 847 },
-    { key: 'keterangan', val: (data.keterangan || '-').toString().toUpperCase(), centerY: 945 },
-    { key: 'price', val: (data.price || '-').toString().toUpperCase(), centerY: 1044 },
-    { key: 'freshBilling', val: (data.freshBilling || '-').toString().toUpperCase(), centerY: 1142 },
+    { key: 'productName', val: (data.productName || '-').toString(), centerY: 749 },
+    { key: 'duration', val: (data.duration || '-').toString(), centerY: 847 },
+    { key: 'keterangan', val: (data.keterangan || '-').toString(), centerY: 945 },
+    { key: 'price', val: (data.price || '-').toString(), centerY: 1044 },
+    { key: 'freshBilling', val: (data.freshBilling || '-').toString(), centerY: 1142 },
   ];
 
-  const textStartX = 430; // 28px gap from left divider line
-  const maxTextWidth = 650;
+  const textStartX = 425; // Directly after vertical divider line
+  const maxTextWidth = 720;
 
   fields.forEach(f => {
-    let fontSize = 34;
+    let fontSize = 38;
     ctx.save();
-    
-    // Reset shadow first to prevent Linux Skia/Cairo canvas text transparency issue
+
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
@@ -111,22 +118,22 @@ async function generateRestockPNG(data = {}) {
     ctx.textBaseline = 'middle';
     ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
 
-    // Auto shrink font size if string overflows box width (max 650px)
+    // Auto shrink font size if text overflows 720px width
     while (ctx.measureText(f.val).width > maxTextWidth && fontSize > 16) {
       fontSize -= 2;
       ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
     }
 
-    // Pass 1: Subtle Neon Blue/Cyan Glow
+    // Pass 1: Neon Cyan Glow
     ctx.shadowColor = 'rgba(0, 240, 255, 0.9)';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.fillStyle = '#00f0ff';
     ctx.fillText(f.val, textStartX, f.centerY);
 
-    // Pass 2: Clean crisp solid text fill on top
+    // Pass 2: Clean crisp white text fill
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#00ffff';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(f.val, textStartX, f.centerY);
 
     ctx.restore();

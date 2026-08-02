@@ -452,7 +452,7 @@ async function startBroadcast(ctx) {
   await updateAdminSession(ctx.from.id, { state: 'broadcast_message', data: {} });
   ctx.answerCbQuery().catch(() => {});
   return ctx.editMessageText(
-    '<b>📢 BROADCAST PESAN</b>\n────────────────────────────\n\nKirim pesan yang ingin di-broadcast ke seluruh member:',
+    '<b>📢 BROADCAST PESAN & MEDIA</b>\n────────────────────────────\n\nKirim pesan (Teks, Foto, Video, Gambar, Dokumen, dll) yang ingin di-broadcast ke seluruh member:',
     { parse_mode: 'HTML' }
   ).catch(() => {});
 }
@@ -762,8 +762,9 @@ async function handleAdminText(ctx) {
     const bot = ctx.telegram;
     for (const doc of usersSnap.docs) {
       try {
-        await bot.sendMessage(doc.id, text, { parse_mode: 'HTML' });
+        await bot.copyMessage(doc.id, ctx.chat.id, ctx.message.message_id);
         sent++;
+        await new Promise(r => setTimeout(r, 40));
       } catch { failed++; }
     }
 
