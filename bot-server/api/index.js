@@ -9,6 +9,17 @@ function setupServer(app) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // CORS Middleware for Telegram WebApp / Webview cross-origin iframe support
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-telegram-user-id, x-admin-secret, ngrok-skip-browser-warning');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Dynamic Domain Auto-Detection Middleware
   app.use((req, res, next) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -24,16 +35,24 @@ function setupServer(app) {
   // API Routes
   app.use('/api/admin', adminApi);
 
-  // Serve Admin Web App (Svelte dist)
+  // Serve Admin Web App (Svelte dist) with CORS headers
   const adminDist = path.join(__dirname, '..', 'admin-app', 'dist');
   const adminLegacy = path.join(__dirname, '..', 'admin');
 
+  const staticOptions = {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    }
+  };
+
   if (fs.existsSync(adminDist)) {
-    app.use('/admin', express.static(adminDist));
+    app.use('/admin', express.static(adminDist, staticOptions));
   }
-  app.use('/admin', express.static(adminLegacy));
+  app.use('/admin', express.static(adminLegacy, staticOptions));
 
   app.get('/admin*', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     if (fs.existsSync(path.join(adminDist, 'index.html'))) {
       res.sendFile(path.join(adminDist, 'index.html'));
     } else {

@@ -1340,43 +1340,52 @@ bot.on('text', async (ctx) => {
 });
 
 // ═══════════════════════════════════════
-// DOCUMENT HANDLER (stock upload)
+// MEDIA & DOCUMENT HANDLERS FOR ADMIN BROADCAST & UPLOADS
 // ═══════════════════════════════════════
 
 bot.on('document', async (ctx) => {
+  const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
+  if (isAdmin) {
+    const adminHandled = await handleAdminText(ctx);
+    if (adminHandled) return;
+  }
   await handleAdminDocument(ctx);
 });
 
-// ═══════════════════════════════════════
-// PHOTO HANDLER (store logo upload)
-// ═══════════════════════════════════════
+['photo', 'video', 'animation', 'audio', 'voice'].forEach(mediaType => {
+  bot.on(mediaType, async (ctx) => {
+    const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
+    if (!isAdmin) return;
 
-bot.on('photo', async (ctx) => {
-  const isAdmin = ctx.from.id.toString() === config.ADMIN_ID.toString();
-  if (!isAdmin) return;
+    // Check if admin broadcast or admin session flow
+    const adminHandled = await handleAdminText(ctx);
+    if (adminHandled) return;
 
-  const session = await (async () => {
-    const doc = await db.collection('admin_sessions').doc(ctx.from.id.toString()).get();
-    return doc.exists ? doc.data() : {};
-  })();
+    if (mediaType === 'photo') {
+      const session = await (async () => {
+        const doc = await db.collection('admin_sessions').doc(ctx.from.id.toString()).get();
+        return doc.exists ? doc.data() : {};
+      })();
 
-  if (session.state === 'nota_upload_logo') {
-    try {
-      const photo = ctx.message.photo[ctx.message.photo.length - 1];
-      const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+      if (session.state === 'nota_upload_logo') {
+        try {
+          const photo = ctx.message.photo[ctx.message.photo.length - 1];
+          const fileLink = await ctx.telegram.getFileLink(photo.file_id);
 
-      await db.collection('settings').doc('store').set({
-        storeLogoUrl: fileLink.href,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+          await db.collection('settings').doc('store').set({
+            storeLogoUrl: fileLink.href,
+            updatedAt: new Date().toISOString(),
+          }, { merge: true });
 
-      await db.collection('admin_sessions').doc(ctx.from.id.toString()).delete().catch(() => { });
-      return ctx.reply('✅ Logo toko berhasil diupdate!');
-    } catch (err) {
-      console.error('Logo upload error:', err);
-      return ctx.reply('❌ Gagal upload logo.');
+          await db.collection('admin_sessions').doc(ctx.from.id.toString()).delete().catch(() => { });
+          return ctx.reply('✅ Logo toko berhasil diupdate!');
+        } catch (err) {
+          console.error('Logo upload error:', err);
+          return ctx.reply('❌ Gagal upload logo.');
+        }
+      }
     }
-  }
+  });
 });
 
 // ═══════════════════════════════════════

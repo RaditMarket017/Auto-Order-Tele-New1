@@ -619,7 +619,25 @@ async function handleAdminText(ctx) {
   const session = await getAdminSession(ctx.from.id);
   if (!session.state) return false;
 
-  const text = ctx.message?.text?.trim();
+  // ─── Broadcast (Supports Text, Photo, Video, Document, Voice, Forwarded Messages) ───
+  if (session.state === 'broadcast_message') {
+    const usersSnap = await db.collection('bot_users').get();
+    let sent = 0, failed = 0;
+
+    const bot = ctx.telegram;
+    for (const doc of usersSnap.docs) {
+      try {
+        await bot.copyMessage(doc.id, ctx.chat.id, ctx.message.message_id);
+        sent++;
+        await new Promise(r => setTimeout(r, 40));
+      } catch { failed++; }
+    }
+
+    await clearAdminSession(ctx.from.id);
+    return ctx.reply(`<b>📢 BROADCAST SELESAI</b>\n────────────────────────────\n\n✅ Terkirim: <b>${sent}</b> member\n❌ Gagal: <b>${failed}</b>`, { parse_mode: 'HTML' }) && true;
+  }
+
+  const text = (ctx.message?.text || ctx.message?.caption || '').trim();
   if (!text) return false;
 
   // ─── Add Product Flow ───
@@ -752,24 +770,6 @@ async function handleAdminText(ctx) {
       `• <b>Kadaluarsa</b> : <b>${dateStr}</b>`,
       { parse_mode: 'HTML' }
     ) && true;
-  }
-
-  // ─── Broadcast ───
-  if (session.state === 'broadcast_message') {
-    const usersSnap = await db.collection('bot_users').get();
-    let sent = 0, failed = 0;
-
-    const bot = ctx.telegram;
-    for (const doc of usersSnap.docs) {
-      try {
-        await bot.copyMessage(doc.id, ctx.chat.id, ctx.message.message_id);
-        sent++;
-        await new Promise(r => setTimeout(r, 40));
-      } catch { failed++; }
-    }
-
-    await clearAdminSession(ctx.from.id);
-    return ctx.reply(`<b>📢 BROADCAST SELESAI</b>\n────────────────────────────\n\n✅ Terkirim: <b>${sent}</b> member\n❌ Gagal: <b>${failed}</b>`, { parse_mode: 'HTML' }) && true;
   }
 
   // ─── Search User ───
