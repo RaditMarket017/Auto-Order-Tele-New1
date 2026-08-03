@@ -14,6 +14,8 @@ const PRESET_VIP_DOMAINS = [
   'rmpremium.biz.id',
 ];
 
+let tmailSessionCookies = {};
+
 /**
  * Get configured TMail API key
  * @returns {string}
@@ -24,16 +26,53 @@ function getApiKey() {
 }
 
 /**
- * Get HTTP headers with Authorization/X-API-Key
+ * Get configured TMail VIP PIN / Password if set
+ * @returns {string}
+ */
+function getPin() {
+  const pin = process.env.TMAIL_PIN || config.TMAIL_PIN || '';
+  return (pin || '').trim();
+}
+
+/**
+ * Auto-unlock VIP Member Only domain via PIN authentication if PIN is set
+ * @param {string} baseUrl
+ */
+async function ensureUnlocked(baseUrl) {
+  const pin = getPin();
+  if (!pin) return;
+  if (tmailSessionCookies[baseUrl]) return;
+
+  try {
+    const res = await axios.post(`${baseUrl}/api/unlock`, { pass: pin }, {
+      headers: getAuthHeaders(),
+      timeout: 10000,
+    });
+
+    const setCookie = res.headers['set-cookie'];
+    if (setCookie && setCookie.length > 0) {
+      tmailSessionCookies[baseUrl] = setCookie.map(c => c.split(';')[0]).join('; ');
+    }
+  } catch (err) {
+    console.warn(`Premur TMail auto-unlock PIN warning on ${baseUrl}:`, err.message);
+  }
+}
+
+/**
+ * Get HTTP headers with Authorization/X-API-Key and Session Cookie
+ * @param {string} [baseUrl]
  * @returns {Record<string, string>}
  */
-function getAuthHeaders() {
+function getAuthHeaders(baseUrl = '') {
   const apiKey = getApiKey();
   const headers = {};
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
     headers['X-API-Key'] = apiKey;
     headers['x-api-key'] = apiKey;
+  }
+  if (baseUrl && tmailSessionCookies[baseUrl]) {
+    headers['Cookie'] = tmailSessionCookies[baseUrl];
   }
   return headers;
 }
@@ -72,7 +111,8 @@ function getBaseUrl(domainOrEmail = '') {
 async function generateTempEmail(customDomain = '', customUsername = '') {
   const targetDomain = customDomain.trim() || PRESET_VIP_DOMAINS[0];
   const baseUrl = getBaseUrl(targetDomain);
-  const headers = getAuthHeaders();
+  await ensureUnlocked(baseUrl);
+  const headers = getAuthHeaders(baseUrl);
   const apiKey = getApiKey();
 
   const params = {
@@ -162,7 +202,8 @@ async function checkInbox(emailOrLogin, domain) {
   if (!email) return [];
 
   const baseUrl = getBaseUrl(email);
-  const headers = getAuthHeaders();
+  await ensureUnlocked(baseUrl);
+  const headers = getAuthHeaders(baseUrl);
   const apiKey = getApiKey();
   const encodedEmail = encodeURIComponent(email);
 
