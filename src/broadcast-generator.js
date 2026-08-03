@@ -5,6 +5,8 @@ const axios = require('axios');
 
 /**
  * Generate RESTOCK PNG image using restock.jpg template
+ * @param {object} data
+ * @returns {Promise<Buffer>}
  */
 async function generateRestockPNG(data = {}) {
   const templatePath = path.join(__dirname, '..', 'restock.jpg');
@@ -82,9 +84,9 @@ async function generateRestockPNG(data = {}) {
     ctx.fillStyle = grad;
     ctx.fillRect(frameX, frameY, frameW, frameH);
 
-    const initial = (data.productName || 'APK').charAt(0).toUpperCase();
+    const initial = (data.productName || data.name || 'APK').charAt(0).toUpperCase();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 120px Arial, "DejaVu Sans", sans-serif';
+    ctx.font = 'bold 120px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
@@ -93,20 +95,26 @@ async function generateRestockPNG(data = {}) {
   }
   ctx.restore();
 
-  // 2. Render Text Fields into 5 rows
+  // 2. Render Text Fields into 5 rows inside restock.jpg boxes
+  const productName = (data.productName || data.name || '-').toString();
+  const duration = (data.duration || data.durasi || '-').toString();
+  const keterangan = (data.keterangan || data.desc || data.detail || '-').toString();
+  const price = (data.price || data.harga || '-').toString();
+  const freshBilling = (data.freshBilling || data.billing || data.fresh_billing || '-').toString();
+
   const fields = [
-    { key: 'productName', val: (data.productName || '-').toString(), centerY: 749 },
-    { key: 'duration', val: (data.duration || '-').toString(), centerY: 847 },
-    { key: 'keterangan', val: (data.keterangan || '-').toString(), centerY: 945 },
-    { key: 'price', val: (data.price || '-').toString(), centerY: 1044 },
-    { key: 'freshBilling', val: (data.freshBilling || '-').toString(), centerY: 1142 },
+    { key: 'productName', val: productName, centerY: 749 },
+    { key: 'duration', val: duration, centerY: 847 },
+    { key: 'keterangan', val: keterangan, centerY: 945 },
+    { key: 'price', val: price, centerY: 1044 },
+    { key: 'freshBilling', val: freshBilling, centerY: 1142 },
   ];
 
-  const textStartX = 425; // Directly after vertical divider line
-  const maxTextWidth = 720;
+  const textStartX = 425; // X position after vertical divider line
+  const maxTextWidth = 720; // Max width before scaling down
 
   fields.forEach(f => {
-    let fontSize = 38;
+    let fontSize = 36;
     ctx.save();
 
     ctx.shadowColor = 'transparent';
@@ -116,16 +124,16 @@ async function generateRestockPNG(data = {}) {
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
+    ctx.font = `bold ${fontSize}px sans-serif`;
 
-    // Auto shrink font size if text overflows 720px width
+    // Auto shrink font size if text overflows maxTextWidth
     while (ctx.measureText(f.val).width > maxTextWidth && fontSize > 16) {
       fontSize -= 2;
-      ctx.font = `bold ${fontSize}px Arial, "DejaVu Sans", "Liberation Sans", sans-serif`;
+      ctx.font = `bold ${fontSize}px sans-serif`;
     }
 
     // Pass 1: Neon Cyan Glow
-    ctx.shadowColor = 'rgba(0, 240, 255, 0.9)';
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
     ctx.shadowBlur = 10;
     ctx.fillStyle = '#00f0ff';
     ctx.fillText(f.val, textStartX, f.centerY);
