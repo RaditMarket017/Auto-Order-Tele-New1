@@ -104,14 +104,12 @@
     autoRefresh = false;
   }
 
-  /**
-   * Helper to detect 4-8 digit OTP verification codes in message subject/body
-   */
-  function findOTPCode(subject = '', body = '') {
-    const combined = `${subject} ${body}`;
-    const match = combined.match(/(?:code|kode|otp|verifikasi|verification|pin)?\s*[:#-]?\s*([0-9]{4,8})/i) ||
-                  combined.match(/\b([0-9]{4,8})\b/);
-    return match ? match[1] : null;
+  function isHTMLContent(str = '') {
+    return /<[a-z][\s\S]*>/i.test(str);
+  }
+
+  function stripHTML(html = '') {
+    return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
   }
 </script>
 
@@ -122,7 +120,7 @@
       <h3 class="font-black text-lg text-white flex items-center gap-2 tracking-wide">
         <span class="text-xl">📫</span> TMail Generator (VIP Custom Domains)
       </h3>
-      <p class="text-xs text-slate-400 mt-1">Generate email sementara instan menggunakan domain VIP pribadi & auto OTP detector</p>
+      <p class="text-xs text-slate-400 mt-1">Generate email sementara instan menggunakan domain VIP pribadi</p>
     </div>
 
     {#if copyToast}
@@ -270,9 +268,10 @@
         {activeTMail ? '📭 Belum ada pesan masuk. Tekan Refresh atau aktifkan Auto Refresh.' : '💡 Generate email terlebih dahulu menggunakan domain VIP di atas.'}
       </div>
     {:else}
-      <div class="space-y-3">
+      <div class="space-y-4">
         {#each inbox as m}
-          {@const otpCode = findOTPCode(m.subject, m.body || m.html)}
+          {@const rawBody = m.html || m.body || ''}
+          {@const hasHTML = isHTMLContent(rawBody)}
           <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3 hover:border-slate-700 transition-all shadow-md">
             <!-- Message Header -->
             <div class="flex items-center justify-between gap-2 flex-wrap text-xs">
@@ -287,34 +286,27 @@
               Subject: <span class="text-slate-200 font-semibold">{m.subject || '(tanpa subjek)'}</span>
             </div>
 
-            <!-- Auto OTP Code Detection Badge -->
-            {#if otpCode}
-              <div class="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/50 p-3 rounded-xl flex items-center justify-between gap-3 shadow-md">
-                <div class="flex items-center gap-2.5 text-xs text-amber-300 font-bold">
-                  <span class="text-lg">⚡</span>
-                  <span>Kode OTP Terdeteksi: <strong class="text-base font-mono text-amber-200 tracking-wider underline font-black">{otpCode}</strong></span>
-                </div>
-                <button
-                  onclick={() => copyText(otpCode, 'Kode OTP')}
-                  class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded-lg shadow-md transition-all cursor-pointer uppercase tracking-wider"
-                >
-                  📋 Copy OTP
-                </button>
+            <!-- Email Content Renderer -->
+            {#if hasHTML}
+              <div class="bg-white rounded-xl p-2 border border-slate-700 shadow-inner overflow-hidden">
+                <iframe
+                  title="Email HTML Preview"
+                  srcdoc={rawBody}
+                  class="w-full min-h-[180px] max-h-[360px] border-0 rounded-lg bg-white"
+                  sandbox="allow-popups allow-same-origin"
+                ></iframe>
               </div>
-            {/if}
-
-            <!-- Body -->
-            {#if m.body}
+            {:else}
               <div class="text-xs text-slate-300 bg-slate-900/90 p-4 rounded-xl font-mono whitespace-pre-wrap border border-slate-800/80 max-h-60 overflow-y-auto leading-relaxed">
-                {m.body}
+                {rawBody}
               </div>
             {/if}
 
             <!-- Copy Body Footer Button -->
             <div class="flex justify-end pt-1">
               <button
-                onclick={() => copyText(m.body || m.subject, 'Isi Pesan')}
-                class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+                onclick={() => copyText(stripHTML(rawBody) || m.subject, 'Isi Pesan')}
+                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
               >
                 📋 Copy Text Pesan
               </button>
@@ -325,5 +317,6 @@
     {/if}
   </div>
 </div>
+
 
 
