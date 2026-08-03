@@ -1,7 +1,7 @@
 const { Markup } = require('telegraf');
 const { db } = require('../firebase');
 const config = require('../config');
-const { formatIDR, escapeHTML, isValidTelegramUrl } = require('../helpers');
+const { formatIDR, escapeHTML, isValidTelegramUrl, stripHTMLTags } = require('../helpers');
 const { t } = require('../i18n');
 const ExcelJS = require('exceljs');
 
@@ -42,7 +42,7 @@ async function clearAdminSession(adminId) {
 
 async function showAdminMenu(ctx) {
   const isAdmin = await checkIsAdmin(ctx.from.id);
-  if (!isAdmin) return ctx.reply(t('id', 'admin_not_authorized'));
+  if (!isAdmin) return ctx.reply(t('id', 'admin_not_authorized'), { parse_mode: 'HTML' });
 
   await clearAdminSession(ctx.from.id);
 
@@ -123,7 +123,7 @@ async function showAdminMenu(ctx) {
 
 async function handleAdminAction(ctx) {
   const isAdmin = await checkIsAdmin(ctx.from.id);
-  if (!isAdmin) return ctx.answerCbQuery(t('id', 'admin_not_authorized'), { show_alert: true }).catch(() => {});
+  if (!isAdmin) return ctx.answerCbQuery(stripHTMLTags(t('id', 'admin_not_authorized')), { show_alert: true }).catch(() => {});
 
   const action = ctx.match?.[0] || ctx.callbackQuery?.data || '';
 

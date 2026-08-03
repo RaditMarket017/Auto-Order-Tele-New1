@@ -121,7 +121,7 @@ async function showProductList(ctx, page = 0, isEdit = false) {
     return ctx.reply(msg, { parse_mode: 'HTML', ...keyboard });
   } catch (err) {
     console.error('showProductList error:', err);
-    return ctx.reply(t(lang, 'error_general'));
+    return ctx.reply(t(lang, 'error_general'), { parse_mode: 'HTML' });
   }
 }
 
@@ -235,7 +235,7 @@ async function showProductDetail(ctx, productId) {
     return ctx.reply(msg, { parse_mode: 'HTML', ...keyboard });
   } catch (err) {
     console.error('showProductDetail error:', err);
-    ctx.reply(t(lang, 'error_general'));
+    ctx.reply(t(lang, 'error_general'), { parse_mode: 'HTML' });
   }
 }
 

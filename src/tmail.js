@@ -11,6 +11,7 @@ function getAuthHeaders() {
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
     headers['X-API-Key'] = apiKey;
+    headers['x-api-key'] = apiKey;
   }
   return headers;
 }
@@ -27,20 +28,31 @@ function getBaseUrl() {
 /**
  * Generate a new temp email address via Premur Shop TMail API
  * Endpoint: GET /api/new
+ * @param {string} [customDomain] - Optional custom domain to use
+ * @param {string} [customUsername] - Optional custom username/prefix to use
  * @returns {Promise<{ email: string, login: string, domain: string }>}
  */
-async function generateTempEmail() {
+async function generateTempEmail(customDomain = '', customUsername = '') {
   const baseUrl = getBaseUrl();
   const headers = getAuthHeaders();
+
+  const params = {};
+  if (customDomain) params.domain = customDomain.trim();
+  if (customUsername) {
+    params.username = customUsername.trim();
+    params.login = customUsername.trim();
+    params.prefix = customUsername.trim();
+  }
 
   try {
     const response = await axios.get(`${baseUrl}/api/new`, {
       headers,
+      params,
       timeout: 15000,
     });
 
-    if (response.data && response.data.email) {
-      const email = response.data.email;
+    if (response.data && (response.data.email || response.data.address)) {
+      const email = response.data.email || response.data.address;
       const parts = email.split('@');
       const login = parts[0] || '';
       const domain = parts[1] || '';
@@ -86,6 +98,12 @@ async function checkInbox(emailOrLogin, domain) {
     if (Array.isArray(response.data)) {
       return response.data;
     }
+    if (response.data && Array.isArray(response.data.messages)) {
+      return response.data.messages;
+    }
+    if (response.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
     return [];
   } catch (err) {
     console.error(`Premur TMail checkInbox error (${email}):`, err.response?.data || err.message);
@@ -105,11 +123,9 @@ async function readMessage(emailOrLogin, domainOrId, messageId) {
   let targetId = null;
 
   if (messageId !== undefined && messageId !== null) {
-    // Called as (login, domain, messageId)
     email = `${emailOrLogin}@${domainOrId}`;
     targetId = messageId;
   } else {
-    // Called as (email, messageId)
     email = emailOrLogin;
     targetId = domainOrId;
   }
@@ -128,12 +144,20 @@ async function readMessage(emailOrLogin, domainOrId, messageId) {
  */
 async function getDomains() {
   const baseUrl = getBaseUrl();
+  const headers = getAuthHeaders();
   try {
-    const response = await axios.get(`${baseUrl}/api/domains`, { timeout: 10000 });
-    if (response.data && Array.isArray(response.data.domains)) {
-      return response.data.domains;
+    const response = await axios.get(`${baseUrl}/api/domains`, { headers, timeout: 10000 });
+    let domains = [];
+    if (response.data) {
+      if (Array.isArray(response.data)) {
+        domains = response.data.map(d => (typeof d === 'string' ? d : d.domain || d.name || String(d)));
+      } else if (Array.isArray(response.data.domains)) {
+        domains = response.data.domains.map(d => (typeof d === 'string' ? d : d.domain || d.name || String(d)));
+      } else if (Array.isArray(response.data.data)) {
+        domains = response.data.data.map(d => (typeof d === 'string' ? d : d.domain || d.name || String(d)));
+      }
     }
-    return [];
+    return domains.filter(Boolean);
   } catch (err) {
     console.error('Premur TMail getDomains error:', err.message);
     return [];

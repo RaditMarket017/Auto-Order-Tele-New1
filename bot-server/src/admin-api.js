@@ -4,7 +4,7 @@ const ExcelJS = require('exceljs');
 const { db } = require('../../src/firebase');
 const config = require('../../src/config');
 const { formatIDR } = require('../../src/helpers');
-const { generateTempEmail, checkInbox, readMessage } = require('../../src/tmail');
+const { generateTempEmail, checkInbox, readMessage, getDomains } = require('../../src/tmail');
 
 // Seamless admin auth middleware (Auto-detect Telegram Admin ID)
 const authAdmin = async (req, res, next) => {
@@ -819,9 +819,21 @@ router.delete('/vouchers/:id', async (req, res) => {
 });
 
 // ─── TMAIL API ───
+router.get('/tmail/domains', async (req, res) => {
+  try {
+    const domains = await getDomains();
+    res.json({ success: true, data: domains });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/tmail/generate', async (req, res) => {
   try {
-    const emailData = await generateTempEmail();
+    const { domain, username, login } = req.query;
+    const targetDomain = domain || '';
+    const targetUsername = username || login || '';
+    const emailData = await generateTempEmail(targetDomain, targetUsername);
     res.json({ success: true, data: emailData });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

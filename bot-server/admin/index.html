@@ -447,26 +447,64 @@
 
     <!-- TMAIL VIEW -->
     <div id="view-tmail" class="view hidden space-y-4">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <h3 class="font-bold text-base text-white">📧 TMail Generator (Admin)</h3>
-          <button onclick="generateTMail()"
-            class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all">
-            ⚡ Generate Email
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5 shadow-xl">
+        <div class="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-800/80">
+          <div>
+            <h3 class="font-bold text-base text-white flex items-center gap-2"><span>📧</span> TMail Generator (Admin Pro)</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Generate email sementara instant dengan support custom domain & auto OTP detector</p>
+          </div>
+          <span id="tmail-copy-toast" class="hidden px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold text-xs rounded-lg animate-pulse"></span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950/70 p-4 rounded-xl border border-slate-800/80">
+          <div class="space-y-1">
+            <label for="tmail-domain-select" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Pilih Domain Email</label>
+            <select id="tmail-domain-select" onchange="onTMailDomainChange(this)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 focus:outline-none">
+              <option value="">🎲 Random / Default Domain</option>
+            </select>
+            <input id="tmail-custom-domain" type="text" placeholder="contoh.com" class="hidden w-full mt-1.5 bg-slate-900 border border-slate-700 text-white text-xs rounded-xl px-3 py-2 focus:outline-none" />
+          </div>
+          <div class="space-y-1">
+            <label for="tmail-custom-username" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Custom Username (Opsional)</label>
+            <input id="tmail-custom-username" type="text" placeholder="misal: cs-admin, verification" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 focus:outline-none" />
+          </div>
+          <div class="flex items-end gap-2">
+            <button onclick="generateTMail()" class="w-full py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-500/20 transition-all">
+              ⚡ Generate Email
+            </button>
+            <button onclick="resetTMailSession()" title="Reset Email Session" class="px-3 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all">
+              🗑
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 flex items-center justify-between flex-wrap gap-3">
+          <div class="space-y-1">
+            <span class="text-[11px] font-semibold text-slate-400">Email Aktif Saat Ini:</span>
+            <div id="tmail-active-address" class="text-sm font-bold text-sky-400 break-all">Belum ada email di-generate</div>
+          </div>
+          <button id="btn-copy-tmail" onclick="copyActiveTMail()" class="hidden px-3.5 py-1.5 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/30 text-sky-300 font-bold text-xs rounded-xl transition-all">
+            📋 Copy Email
           </button>
         </div>
-        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-1">
-          <span class="text-[11px] text-slate-400">Email Aktif:</span>
-          <div id="tmail-active-address" class="text-sm font-bold text-sky-400 break-all">-</div>
+
+        <div class="flex items-center justify-between flex-wrap gap-2 pt-1">
+          <div class="flex items-center gap-2">
+            <button onclick="checkTMailInbox()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5">
+              🔄 Refresh Inbox
+            </button>
+            <button id="btn-tmail-autorefresh" onclick="toggleTMailAutoRefresh()" class="px-3 py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-400 hover:text-white flex items-center gap-1.5">
+              <span id="tmail-auto-indicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              Auto Refresh (5s): <span id="tmail-auto-status">OFF</span>
+            </button>
+          </div>
+          <span class="text-xs text-slate-500 font-mono">Total Pesan: <strong id="tmail-total-count" class="text-slate-300">0</strong></span>
         </div>
-        <button onclick="checkTMailInbox()"
-          class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl">
-          🔄 Refresh Inbox
-        </button>
+
         <div class="space-y-2 pt-2">
-          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Surat Masuk</h4>
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><span>📥</span> Surat Masuk (Inbox)</h4>
           <div id="tmail-inbox-list" class="space-y-2">
-            <p class="text-xs text-slate-500">Belum ada email di-generate.</p>
+            <div class="text-center py-8 bg-slate-950/50 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">💡 Generate email terlebih dahulu di atas.</div>
           </div>
         </div>
       </div>
@@ -1649,33 +1687,156 @@
       }
 
       // ─── TMAIL ───
+      let tmailAutoRefreshTimer = null;
+      let isTMailAutoRefresh = false;
+
+      async function loadTMailDomains() {
+        const select = document.getElementById('tmail-domain-select');
+        if (!select) return;
+        try {
+          const res = await apiFetch('/api/admin/tmail/domains');
+          if (res.success && Array.isArray(res.data)) {
+            let html = '<option value="">🎲 Random / Default Domain</option>';
+            res.data.forEach(d => {
+              html += `<option value="${d}">🌐 ${d}</option>`;
+            });
+            html += '<option value="custom">✏️ Input Domain Manual...</option>';
+            select.innerHTML = html;
+          }
+        } catch {}
+      }
+
+      function onTMailDomainChange(select) {
+        const input = document.getElementById('tmail-custom-domain');
+        if (select.value === 'custom') {
+          input.classList.remove('hidden');
+        } else {
+          input.classList.add('hidden');
+        }
+      }
+
       async function generateTMail() {
-        const res = await apiFetch('/api/admin/tmail/generate');
-        if (!res.success) return;
+        const select = document.getElementById('tmail-domain-select');
+        const customDomInput = document.getElementById('tmail-custom-domain');
+        const customUserInput = document.getElementById('tmail-custom-username');
+
+        const domainVal = select.value === 'custom' ? customDomInput.value.trim() : select.value;
+        const userVal = customUserInput.value.trim();
+
+        const url = `/api/admin/tmail/generate?domain=${encodeURIComponent(domainVal)}&username=${encodeURIComponent(userVal)}`;
+        const res = await apiFetch(url);
+        if (!res.success) return alert(res.error || 'Gagal generate email.');
+
         activeTMail = res.data;
         document.getElementById('tmail-active-address').innerText = activeTMail.email;
+        document.getElementById('btn-copy-tmail').classList.remove('hidden');
         checkTMailInbox();
       }
 
       async function checkTMailInbox() {
-        if (!activeTMail) return alert('Generate email terlebih dahulu!');
-        const res = await apiFetch(`/api/admin/tmail/inbox?login=${activeTMail.login}&domain=${activeTMail.domain}`);
+        if (!activeTMail) return;
+        const res = await apiFetch(`/api/admin/tmail/inbox?email=${encodeURIComponent(activeTMail.email)}&login=${activeTMail.login}&domain=${activeTMail.domain}`);
         if (!res.success) return;
 
         const container = document.getElementById('tmail-inbox-list');
-        if (res.data.length === 0) {
-          container.innerHTML = '<p class="text-xs text-slate-500">Belum ada pesan masuk.</p>';
+        const countSpan = document.getElementById('tmail-total-count');
+        const messages = res.data || [];
+        if (countSpan) countSpan.innerText = messages.length;
+
+        if (messages.length === 0) {
+          container.innerHTML = '<div class="text-center py-8 bg-slate-950/50 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">📭 Belum ada pesan masuk. Tekan Refresh atau aktifkan Auto Refresh.</div>';
           return;
         }
 
-        container.innerHTML = res.data.map(m => `
-        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
-          <div class="text-xs font-bold text-sky-400">From: ${m.from}</div>
-          <div class="text-xs font-semibold text-white">Subject: ${m.subject || '(no subject)'}</div>
-          <div class="text-[10px] text-slate-500">${m.date}</div>
-        </div>
-      `).join('');
+        container.innerHTML = messages.map(m => {
+          const bodyText = m.body || m.html || '';
+          const match = `${m.subject || ''} ${bodyText}`.match(/(?:code|kode|otp|verifikasi|verification|pin)?\s*[:#-]?\s*([0-9]{4,8})/i) ||
+                        `${m.subject || ''} ${bodyText}`.match(/\b([0-9]{4,8})\b/);
+          const otpCode = match ? match[1] : null;
+
+          let otpBadgeHtml = '';
+          if (otpCode) {
+            otpBadgeHtml = `
+              <div class="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 p-2.5 rounded-xl flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 text-xs text-amber-300">
+                  <span class="text-base">⚡</span>
+                  <span>Kode OTP Terdeteksi: <strong class="text-base font-mono text-amber-200 tracking-wider underline">${otpCode}</strong></span>
+                </div>
+                <button onclick="copyTextDirect('${otpCode}', 'Kode OTP')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg shadow transition-all cursor-pointer">
+                  📋 Copy OTP
+                </button>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2 hover:border-slate-700 transition-all">
+              <div class="flex items-center justify-between gap-2 flex-wrap text-xs">
+                <span class="font-bold text-sky-400 bg-sky-950/50 px-2.5 py-1 rounded-lg border border-sky-800/40">From: ${escapeHTML(m.from || 'Unknown')}</span>
+                <span class="text-[11px] text-slate-400 font-mono">${escapeHTML(m.date || '')}</span>
+              </div>
+              <div class="text-xs font-bold text-white">Subject: <span class="text-slate-200 font-semibold">${escapeHTML(m.subject || '(tanpa subjek)')}</span></div>
+              ${otpBadgeHtml}
+              ${m.body ? `<div class="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg font-mono whitespace-pre-wrap border border-slate-800/60 max-h-56 overflow-y-auto leading-relaxed">${escapeHTML(m.body)}</div>` : ''}
+              <div class="flex justify-end pt-1">
+                <button onclick="copyTextDirect(\`${escapeHTML(m.body || m.subject || '')}\`, 'Isi Pesan')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1">
+                  📋 Copy Text Pesan
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
       }
+
+      function copyActiveTMail() {
+        if (activeTMail?.email) {
+          copyTextDirect(activeTMail.email, 'Email');
+        }
+      }
+
+      function copyTextDirect(text, label) {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        const toast = document.getElementById('tmail-copy-toast');
+        if (toast) {
+          toast.innerText = `✅ ${label} Berhasil Disalin!`;
+          toast.classList.remove('hidden');
+          setTimeout(() => { toast.classList.add('hidden'); }, 2000);
+        }
+      }
+
+      function toggleTMailAutoRefresh() {
+        isTMailAutoRefresh = !isTMailAutoRefresh;
+        const btn = document.getElementById('btn-tmail-autorefresh');
+        const indicator = document.getElementById('tmail-auto-indicator');
+        const statusText = document.getElementById('tmail-auto-status');
+
+        if (isTMailAutoRefresh) {
+          statusText.innerText = 'ON';
+          indicator.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+          btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center gap-1.5';
+          checkTMailInbox();
+          tmailAutoRefreshTimer = setInterval(() => { if (activeTMail) checkTMailInbox(); }, 5000);
+        } else {
+          statusText.innerText = 'OFF';
+          indicator.className = 'w-2 h-2 rounded-full bg-slate-500';
+          btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-400 hover:text-white flex items-center gap-1.5';
+          if (tmailAutoRefreshTimer) { clearInterval(tmailAutoRefreshTimer); tmailAutoRefreshTimer = null; }
+        }
+      }
+
+      function resetTMailSession() {
+        activeTMail = null;
+        document.getElementById('tmail-active-address').innerText = 'Belum ada email di-generate';
+        document.getElementById('btn-copy-tmail').classList.add('hidden');
+        document.getElementById('tmail-inbox-list').innerHTML = '<div class="text-center py-8 bg-slate-950/50 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">💡 Generate email terlebih dahulu di atas.</div>';
+        if (isTMailAutoRefresh) toggleTMailAutoRefresh();
+      }
+
+      // Load TMail domains when switching nav
+      window.addEventListener('DOMContentLoaded', () => {
+        loadTMailDomains();
+      });
 
       // ─── SETTINGS & MAINTENANCE ───
       async function loadSettings() {

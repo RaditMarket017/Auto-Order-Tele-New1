@@ -3,7 +3,7 @@ const { db } = require('../firebase');
 const config = require('../config');
 const { t } = require('../i18n');
 const { generateTempEmail, checkInbox, readMessage } = require('../tmail');
-const { escapeHTML } = require('../helpers');
+const { escapeHTML, stripHTMLTags } = require('../helpers');
 
 async function checkIsAdmin(userId) {
   if (!userId) return false;
@@ -26,7 +26,7 @@ async function getUserLang(userId) {
  */
 async function showTMailMenu(ctx) {
   const isAdmin = await checkIsAdmin(ctx.from.id);
-  if (!isAdmin) return ctx.answerCbQuery(t('id', 'admin_not_authorized'), { show_alert: true }).catch(() => {});
+  if (!isAdmin) return ctx.answerCbQuery(stripHTMLTags(t('id', 'admin_not_authorized')), { show_alert: true }).catch(() => {});
 
   const lang = await getUserLang(ctx.from.id);
 
@@ -59,7 +59,7 @@ async function showTMailMenu(ctx) {
  */
 async function handleTMailAction(ctx) {
   const isAdmin = await checkIsAdmin(ctx.from.id);
-  if (!isAdmin) return ctx.answerCbQuery(t('id', 'admin_not_authorized'), { show_alert: true }).catch(() => {});
+  if (!isAdmin) return ctx.answerCbQuery(stripHTMLTags(t('id', 'admin_not_authorized')), { show_alert: true }).catch(() => {});
 
   const action = ctx.match?.[0] || '';
   const lang = await getUserLang(ctx.from.id);
@@ -97,7 +97,7 @@ async function handleTMailAction(ctx) {
   if (action === 'tmail_inbox') {
     const sessionDoc = await db.collection('admin_tmail_sessions').doc(ctx.from.id.toString()).get();
     if (!sessionDoc.exists || !sessionDoc.data().email) {
-      return ctx.answerCbQuery(t(lang, 'tmail_no_active'), { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery(stripHTMLTags(t(lang, 'tmail_no_active')), { show_alert: true }).catch(() => {});
     }
 
     const session = sessionDoc.data();
@@ -169,7 +169,7 @@ async function handleTMailAction(ctx) {
 
   if (action === 'tmail_delete') {
     await db.collection('admin_tmail_sessions').doc(ctx.from.id.toString()).delete();
-    ctx.answerCbQuery(t(lang, 'tmail_deleted')).catch(() => {});
+    ctx.answerCbQuery(stripHTMLTags(t(lang, 'tmail_deleted'))).catch(() => {});
     return showTMailMenu(ctx);
   }
 

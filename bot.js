@@ -9,7 +9,7 @@ const { Telegraf, Markup } = require('telegraf');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { db } = require('./src/firebase');
 const config = require('./src/config');
-const { formatIDR, formatDateID, delay, escapeHTML, isValidTelegramUrl } = require('./src/helpers');
+const { formatIDR, formatDateID, delay, escapeHTML, isValidTelegramUrl, stripHTMLTags } = require('./src/helpers');
 const { t } = require('./src/i18n');
 const { clearCart } = require('./src/session');
 
@@ -233,7 +233,7 @@ bot.start(async (ctx) => {
     await sendWelcomeMessage(ctx);
   } catch (err) {
     console.error('/start error:', err);
-    ctx.reply(t('id', 'error_general'));
+    ctx.reply(t('id', 'error_general'), { parse_mode: 'HTML' });
   }
 });
 
@@ -417,7 +417,7 @@ async function showStockStatus(ctx) {
     return ctx.reply(msg, { parse_mode: 'HTML' });
   } catch (err) {
     console.error('Stock error:', err);
-    ctx.reply(t(lang, 'error_general'));
+    ctx.reply(t(lang, 'error_general'), { parse_mode: 'HTML' });
   }
 }
 
@@ -603,7 +603,7 @@ bot.on('callback_query', async (ctx) => {
       .slice(0, 5);
 
     if (docs.length === 0) {
-      ctx.answerCbQuery(t(lang, 'history_no_orders'), { show_alert: true }).catch(() => { });
+      ctx.answerCbQuery(stripHTMLTags(t(lang, 'history_no_orders')), { show_alert: true }).catch(() => { });
       return;
     }
 
@@ -700,7 +700,7 @@ bot.on('callback_query', async (ctx) => {
       .slice(0, 5);
 
     if (docs.length === 0) {
-      ctx.answerCbQuery(t(lang, 'history_no_topup'), { show_alert: true }).catch(() => { });
+      ctx.answerCbQuery(stripHTMLTags(t(lang, 'history_no_topup')), { show_alert: true }).catch(() => { });
       return;
     }
 
@@ -744,7 +744,7 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'set_lang_id' || data === 'set_lang_en') {
     const newLang = data === 'set_lang_id' ? 'id' : 'en';
     await db.collection('bot_users').doc(ctx.from.id.toString()).update({ language: newLang });
-    ctx.answerCbQuery(t(newLang, 'lang_changed')).catch(() => { });
+    ctx.answerCbQuery(stripHTMLTags(t(newLang, 'lang_changed'))).catch(() => { });
 
     // Update keyboard
     ctx.reply(t(newLang, 'lang_changed'), { parse_mode: 'HTML', ...getReplyKeyboard(newLang) });

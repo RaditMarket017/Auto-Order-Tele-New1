@@ -62,7 +62,7 @@ async function showOrderSummary(ctx, productId, variantIndex) {
     ctx.answerCbQuery().catch(() => {});
   } catch (err) {
     console.error('showOrderSummary error:', err);
-    ctx.reply(t(lang, 'error_general'));
+    ctx.reply(t(lang, 'error_general'), { parse_mode: 'HTML' });
   }
 }
 

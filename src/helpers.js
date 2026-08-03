@@ -117,6 +117,7 @@ module.exports = {
   formatIDR,
   escapeHTML,
   escapeMarkdown,
+  stripHTMLTags,
   generateOrderId,
   formatDateID,
   delay,

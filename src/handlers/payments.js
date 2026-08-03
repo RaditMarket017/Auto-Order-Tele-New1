@@ -108,7 +108,7 @@ async function handleQRISPayment(ctx, productId, variantIndex, preferredGateway 
     const cart = await getCart(userId);
     if (!cart) return ctx.answerCbQuery('Tidak ada pesanan.', { show_alert: true }).catch(() => {});
 
-    ctx.answerCbQuery(t(lang, 'payment_processing')).catch(() => {});
+    ctx.answerCbQuery(stripTags(t(lang, 'payment_processing'))).catch(() => {});
     // Delete order summary message on QRIS payment initiation
     ctx.deleteMessage().catch(() => {});
 
@@ -400,7 +400,7 @@ async function cancelOrder(ctx, orderId) {
 
     await db.collection('orders').doc(orderId).update({ status: 'cancelled' });
 
-    ctx.answerCbQuery(t(lang, 'payment_cancelled')).catch(() => {});
+    ctx.answerCbQuery(stripTags(t(lang, 'payment_cancelled'))).catch(() => {});
     ctx.deleteMessage().catch(() => {});
   } catch (err) {
     console.error('cancelOrder error:', err);
