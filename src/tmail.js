@@ -99,7 +99,6 @@ async function generateTempEmail(customDomain = '', customUsername = '') {
       let login = parts[0] || '';
       let domain = parts[1] || targetDomain;
 
-      // If user specified custom username prefix, enforce it
       if (customUsername.trim()) {
         const cleanUser = customUsername.trim().toLowerCase().replace(/[^a-z0-9.]/g, '');
         if (cleanUser && login !== cleanUser) {
@@ -111,7 +110,6 @@ async function generateTempEmail(customDomain = '', customUsername = '') {
       return { email, login, domain };
     }
 
-    // Fallback constructed email if server returns success without body
     if (customUsername.trim()) {
       const cleanUser = customUsername.trim().toLowerCase().replace(/[^a-z0-9.]/g, '');
       const email = `${cleanUser}@${targetDomain}`;
@@ -123,13 +121,25 @@ async function generateTempEmail(customDomain = '', customUsername = '') {
   } catch (err) {
     console.warn(`Premur TMail generateTempEmail warning on ${baseUrl}:`, err.response?.data || err.message);
 
-    // Fallback email construction if endpoint fails
     const cleanUser = customUsername.trim()
       ? customUsername.trim().toLowerCase().replace(/[^a-z0-9.]/g, '')
       : 'mail' + Math.random().toString(36).substring(2, 10);
     const email = `${cleanUser}@${targetDomain}`;
     return { email, login: cleanUser, domain: targetDomain };
   }
+}
+
+/**
+ * Helper to extract messages array from response object/data
+ * @param {any} data
+ * @returns {Array<object>}
+ */
+function extractMessages(data) {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.messages)) return data.messages;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
 }
 
 /**
@@ -154,38 +164,33 @@ async function checkInbox(emailOrLogin, domain) {
   const baseUrl = getBaseUrl(email);
   const headers = getAuthHeaders();
   const apiKey = getApiKey();
+  const encodedEmail = encodeURIComponent(email);
 
   try {
-    const encodedEmail = encodeURIComponent(email);
     const response = await axios.get(`${baseUrl}/api/bot/inbox/${encodedEmail}`, {
       headers,
       params: { api_key: apiKey },
       timeout: 15000,
     });
-
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    if (response.data && Array.isArray(response.data.messages)) {
-      return response.data.messages;
-    }
-    if (response.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    }
-    return [];
+    return extractMessages(response.data);
   } catch (err) {
-    // Retry with fallback /api/inbox endpoint
+    if (err.response && err.response.data) {
+      const msgs = extractMessages(err.response.data);
+      if (msgs.length > 0) return msgs;
+    }
+
     try {
-      const encodedEmail = encodeURIComponent(email);
       const resp2 = await axios.get(`${baseUrl}/api/inbox/${encodedEmail}`, {
         headers,
         params: { api_key: apiKey },
         timeout: 12000,
       });
-      if (Array.isArray(resp2.data)) return resp2.data;
-      if (resp2.data && Array.isArray(resp2.data.messages)) return resp2.data.messages;
-      return [];
-    } catch {
+      return extractMessages(resp2.data);
+    } catch (err2) {
+      if (err2.response && err2.response.data) {
+        const msgs = extractMessages(err2.response.data);
+        if (msgs.length > 0) return msgs;
+      }
       console.error(`Premur TMail checkInbox error (${email}):`, err.response?.data || err.message);
       return [];
     }
@@ -253,7 +258,6 @@ async function getDomains() {
     console.warn('Premur TMail getDomains fetch warning:', err.message);
   }
 
-  // Combine VIP preset domains with fetched domains (VIP domains first)
   const combined = [...PRESET_VIP_DOMAINS];
   fetchedDomains.forEach(d => {
     if (!combined.includes(d)) combined.push(d);
