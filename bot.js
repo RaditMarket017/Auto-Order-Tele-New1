@@ -380,16 +380,24 @@ async function showStockStatus(ctx) {
     const poolSnap = await db.collection('credentials_pool').where('isUsed', '==', false).get();
     const stockMap = {};
     poolSnap.forEach(d => {
-      const pId = d.data().productId;
-      stockMap[pId] = (stockMap[pId] || 0) + 1;
+      const data = d.data();
+      const pId = data.productId;
+      const vLabel = data.variantLabel || 'Default';
+      if (!stockMap[pId]) stockMap[pId] = {};
+      stockMap[pId][vLabel] = (stockMap[pId][vLabel] || 0) + 1;
     });
 
     products.forEach(p => {
-      if (!p.requiresEmail) {
-        p.stock = stockMap[p.id] || 0;
-      } else {
-        p.stock = (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-      }
+      const reqEmail = Boolean(p.requiresEmail);
+      const variantStocks = (p.variants || []).map(v => {
+        if (reqEmail || v.inviteEnabled) {
+          return (v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0;
+        } else {
+          const poolCount = stockMap[p.id]?.[v.label] || 0;
+          return (poolCount > 0 || v.stock === undefined || v.stock === null) ? poolCount : Number(v.stock || 0);
+        }
+      });
+      p.stock = variantStocks.reduce((s, v) => s + Number(v || 0), 0);
     });
 
     let msg = t(lang, 'stock_title') + '\n';

@@ -5,6 +5,7 @@ const { db } = require('../../src/firebase');
 const config = require('../../src/config');
 const { formatIDR } = require('../../src/helpers');
 const { generateTempEmail, checkInbox, readMessage, getDomains } = require('../../src/tmail');
+const { generateRestockPNG, overlayWatermarkLogo } = require('../../src/broadcast-generator');
 
 // Seamless admin auth middleware (Auto-detect Telegram Admin ID)
 const authAdmin = async (req, res, next) => {
@@ -877,10 +878,23 @@ router.get('/settings', async (req, res) => {
     const storeData = storeDoc.exists ? storeDoc.data() : {};
     const sysData = sysDoc.exists ? sysDoc.data() : {};
 
+    const uploadSec = storeData.warrantyUploadTimeoutSeconds !== undefined 
+      ? Number(storeData.warrantyUploadTimeoutSeconds) 
+      : (storeData.warrantyUploadTimeoutMinutes ? Number(storeData.warrantyUploadTimeoutMinutes) * 60 : 300);
+      
+    const busySec = storeData.adminProcessBusyTimeoutSeconds !== undefined 
+      ? Number(storeData.adminProcessBusyTimeoutSeconds) 
+      : (storeData.adminProcessBusyTimeoutMinutes ? Number(storeData.adminProcessBusyTimeoutMinutes) * 60 : 600);
+
+    const defaultBusyMsg = "Mohon maaf, admin kemungkinan sedang sibuk. Namun, kami akan tetap memproses klaim Anda. Silakan menunggu.";
+
     res.json({
       success: true,
       data: {
         ...storeData,
+        warrantyUploadTimeoutSeconds: uploadSec,
+        adminProcessBusyTimeoutSeconds: busySec,
+        adminBusyMessageTemplate: storeData.adminBusyMessageTemplate || defaultBusyMsg,
         botToken: sysData.botToken || storeData.botToken || config.BOT_TOKEN || '',
         mustJoinEnabled: sysData.mustJoinEnabled !== undefined ? sysData.mustJoinEnabled : (storeData.mustJoinEnabled !== false),
         requiredChannelId: sysData.requiredChannelId || storeData.requiredChannelId || config.REQUIRED_CHANNEL_ID || '',
@@ -932,7 +946,6 @@ router.get('/maintenance', async (req, res) => {
 });
 
 // ─── BROADCAST MANAGER ───
-const { generateRestockPNG } = require('../../src/broadcast-generator');
 
 function getMediaType(url, explicitType) {
   if (explicitType && explicitType !== 'auto') return explicitType;
@@ -974,8 +987,14 @@ router.post('/broadcast', async (req, res) => {
       productName,
       duration,
       keterangan,
+      stockCount,
       price,
+      bulkPrice1,
+      bulkPrice2,
       freshBilling,
+      bonusInfo,
+      footerText,
+      restockImage,
       mediaUrl,
       mediaType,
       sendToChannel,
@@ -993,14 +1012,23 @@ router.post('/broadcast', async (req, res) => {
     // 1. Format text message based on variant specification
     let formattedText = '';
     if (isRestock) {
-      if (usePng) {
-        // Caption text for PNG Restock
-        formattedText = `♻️ <b>RESTOCK TERSEDIA!</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n📌 <b>Keterangan :</b> ${keterangan || '-'}\n💰 <b>Harga :</b> ${price || '-'}\n🆕 <b>Fresh Billing :</b> ${freshBilling || '-'}`;
-      } else {
-        // Text format for RESTOCK PNG OFF
-        const linkStr = apkLogoUrl && apkLogoUrl.trim() ? `\n🔗 Link Ikon Aplikasi: ${apkLogoUrl.trim()}\n` : '';
-        formattedText = `♻️ <b>RESTOCK TERSEDIA!</b>\n${linkStr}\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n📌 <b>Keterangan :</b> ${keterangan || '-'}\n💰 <b>Harga :</b> ${price || '-'}\n🆕 <b>Fresh Billing :</b> ${freshBilling || '-'}`;
-      }
+      const lines = ['♻️ <b>RESTOCK TERSEDIA!</b>\n'];
+      if (productName) lines.push(`📦 <b>Produk :</b> ${productName}`);
+      if (duration) lines.push(`⏳ <b>Durasi :</b> ${duration}`);
+      if (keterangan) lines.push(`📌 <b>Keterangan :</b> ${keterangan}`);
+      if (stockCount) lines.push(`📊 <b>Stock :</b> ${stockCount}`);
+      if (price) lines.push(`💰 <b>Harga :</b> ${price}`);
+      if (bulkPrice1) lines.push(`💰 <b>Bulk 3 :</b> ${bulkPrice1}`);
+      if (bulkPrice2) lines.push(`💰 <b>Bulk 5 :</b> ${bulkPrice2}`);
+      if (freshBilling) lines.push(`🆕 <b>Fresh Billing :</b> ${freshBilling}`);
+      if (bonusInfo) lines.push(bonusInfo);
+
+      const customFooter = (footerText && footerText.trim())
+        ? footerText.trim()
+        : '📩 <b>Langsung PM sekarang juga!</b>\nBuruan order sekarang sebelum stock habis! 🚀';
+
+      lines.push('\n' + customFooter);
+      formattedText = lines.join('\n');
     } else if (selectedVariant === 'PERUBAHAN_HARGA') {
       formattedText = `📢 <b>PERUBAHAN HARGA</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n⏳ <b>Durasi :</b> ${duration || '-'}\n💰 <b>Harga Baru :</b> ${price || '-'}\n\n📌 <i>Catatan:</i>\nHarga telah diperbarui, silakan cek sebelum order.`;
     } else if (selectedVariant === 'DISKON') {
@@ -1009,9 +1037,12 @@ router.post('/broadcast', async (req, res) => {
       formattedText = `📢 <b>INFORMASI PENTING</b>\n\n📦 <b>Produk :</b> ${productName || '-'}\n\n📌 <b>Detail:</b>\n${keterangan || '-'}\n\n<i>Mohon diperhatikan sebelum transaksi.</i>`;
     }
 
-    // 2. Generate PNG buffer if RESTOCK + PNG ON
+    // 2. Generate PNG buffer or Watermark Restock Image
     let pngBuffer = null;
-    if (usePng) {
+    if (isRestock && (restockImage || mediaUrl)) {
+      const imgSource = restockImage || mediaUrl;
+      pngBuffer = await overlayWatermarkLogo(imgSource, { position: 'top-left' });
+    } else if (usePng) {
       pngBuffer = await generateRestockPNG({
         apkLogoUrl,
         productName,

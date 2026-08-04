@@ -58,16 +58,27 @@ async function showProductList(ctx, page = 0, isEdit = false) {
     const poolSnap = await db.collection('credentials_pool').where('isUsed', '==', false).get();
     const stockMap = {};
     poolSnap.forEach(d => {
-      const pId = d.data().productId;
-      stockMap[pId] = (stockMap[pId] || 0) + 1;
+      const data = d.data();
+      const pId = data.productId;
+      const vLabel = data.variantLabel || 'Default';
+      if (!stockMap[pId]) stockMap[pId] = {};
+      stockMap[pId][vLabel] = (stockMap[pId][vLabel] || 0) + 1;
     });
 
     for (let i = 0; i < pageProducts.length; i++) {
       const p = pageProducts[i];
-      const isReqEmail = Boolean(p.requiresEmail || (p.variants || []).some(v => v.inviteEnabled));
-      const totalStock = isReqEmail
-        ? (p.variants || []).reduce((s, v) => s + (Number(v.stock) || 0), 0)
-        : (stockMap[p.id] || 0);
+      const reqEmail = Boolean(p.requiresEmail);
+      const totalStock = (p.variants || []).reduce((s, v) => {
+        let vStock;
+        if (reqEmail || v.inviteEnabled) {
+          vStock = (v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0;
+        } else {
+          const poolCount = stockMap[p.id]?.[v.label] || 0;
+          vStock = (poolCount > 0 || v.stock === undefined || v.stock === null) ? poolCount : Number(v.stock || 0);
+        }
+        return s + Number(vStock || 0);
+      }, 0);
+
       msg += t(lang, 'product_list_item', {
         num: startNum + i,
         name: escapeHTML(p.name).toUpperCase(),
@@ -163,9 +174,10 @@ async function showProductDetail(ctx, productId) {
     // Add variant list with price and stock per variant
     for (const v of variants) {
       const price = await getProductPrice(v, userId);
+      const poolCount = stockByVariant[v.label] || 0;
       const vStock = (isReqEmail || v.inviteEnabled)
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
-        : (stockByVariant[v.label] || 0);
+        : ((poolCount > 0 || v.stock === undefined || v.stock === null) ? poolCount : Number(v.stock || 0));
       const stockBadge = vStock > 0 ? `🟢 <b>${vStock}</b>` : `🔴 <b>0 (Habis)</b>`;
 
       const rawLabel = (v.label || '').trim();
@@ -203,9 +215,10 @@ async function showProductDetail(ctx, productId) {
     const buttons = [];
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
+      const poolCount = stockByVariant[v.label] || 0;
       const stock = (isReqEmail || v.inviteEnabled)
         ? ((v.stock !== undefined && v.stock !== null) ? Number(v.stock) : 0)
-        : (stockByVariant[v.label] || 0);
+        : ((poolCount > 0 || v.stock === undefined || v.stock === null) ? poolCount : Number(v.stock || 0));
       const btnTitle = (v.label || '').split('\n')[0].trim();
       const label = stock > 0 ? `🛒 ${btnTitle}` : `❌ ${btnTitle} (Habis)`;
       buttons.push([Markup.button.callback(label, stock > 0 ? `buy_${productId}_${i}` : `noop`)]);

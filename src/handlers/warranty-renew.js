@@ -20,6 +20,25 @@ async function getStoreSettings() {
 }
 
 /**
+ * Helper to format timeout duration in seconds/minutes/hours
+ */
+function formatTimeoutDuration(seconds) {
+  const sec = Number(seconds || 300);
+  if (sec < 60) {
+    return `${sec} detik`;
+  }
+  if (sec % 3600 === 0) {
+    return `${sec / 3600} jam`;
+  }
+  const mins = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  if (remSec > 0) {
+    return `${mins} mnt ${remSec} dtk`;
+  }
+  return `${mins} menit`;
+}
+
+/**
  * Calculate Warranty Status
  */
 function getWarrantyInfo(order) {
@@ -31,24 +50,31 @@ function getWarrantyInfo(order) {
     return { hasWarranty: false, isExpired: true, alreadyClaimed: false, remainingStr: 'Tidak ada garansi' };
   }
 
-  // Check if warranty has already been claimed (1x max per order) or expired via photo upload timeout
+  // Check if warranty has already been claimed (1x max per order), canceled by user, or expired via photo upload timeout
   const uploadExpired = order.warrantyClaimStatus === 'pending_proof' && order.uploadDeadlineAt && nowMs > new Date(order.uploadDeadlineAt).getTime();
+  const isCanceled = order.warrantyClaimStatus === 'canceled_user';
+  const isTimeout = order.warrantyClaimStatus === 'expired_timeout' || uploadExpired;
+
   const alreadyClaimed = Boolean(order.warrantyClaimed) || 
     (Array.isArray(order.warrantyClaims) && order.warrantyClaims.length > 0) || 
     Boolean(order.lastWarrantyStatus) || 
-    order.warrantyClaimStatus === 'expired_timeout' ||
-    uploadExpired;
+    isTimeout ||
+    isCanceled;
 
   if (alreadyClaimed) {
-    const isTimeout = order.warrantyClaimStatus === 'expired_timeout' || uploadExpired;
-    const timeoutMsg = order.warrantyTimeoutMessage || 'Garansi sudah hangus karena batas waktu pengiriman bukti telah habis.';
-    const customExpiredMsg = order.warrantyExpiredMessage || 'Klaim Garansi Telah Digunakan (1x)';
+    let statusText = order.warrantyExpiredMessage || 'Klaim Garansi Telah Digunakan (1x)';
+    if (isTimeout) {
+      statusText = 'Garansi Hangus (Waktu kirim bukti habis)';
+    } else if (isCanceled) {
+      statusText = 'Garansi Hangus (Dibatalkan pembeli)';
+    }
     return {
       hasWarranty: true,
       alreadyClaimed: true,
       isExpired: false,
       isTimeout,
-      remainingStr: isTimeout ? timeoutMsg : customExpiredMsg,
+      isCanceled,
+      remainingStr: statusText,
       warrantyDays,
       csMessage: order.warrantyCsMessage || ''
     };
@@ -261,8 +287,8 @@ async function safeEditMessage(ctx, text, extra = {}) {
 async function checkPendingWarrantyAdminBusyTimeouts(bot) {
   try {
     const storeSettings = await getStoreSettings();
-    const busyTimeoutMins = Number(storeSettings.adminProcessBusyTimeoutMinutes || 10);
-    const busyTimeoutMs = busyTimeoutMins * 60 * 1000;
+    const busyTimeoutSec = Number(storeSettings.adminProcessBusyTimeoutSeconds || (storeSettings.adminProcessBusyTimeoutMinutes ? storeSettings.adminProcessBusyTimeoutMinutes * 60 : 600));
+    const busyTimeoutMs = busyTimeoutSec * 1000;
     const now = Date.now();
 
     // 1. Cleanup expired pending_proof sessions (upload proof timeout)
@@ -271,17 +297,22 @@ async function checkPendingWarrantyAdminBusyTimeouts(bot) {
       .get();
 
     for (const doc of proofTimeoutSnap.docs) {
-      const order = doc.data();
+      const order = { id: doc.id, ...doc.data() };
       if (order.uploadDeadlineAt && now > new Date(order.uploadDeadlineAt).getTime()) {
         await doc.ref.update({
           warrantyClaimed: true,
           warrantyClaimStatus: 'expired_timeout',
           lastWarrantyStatus: 'expired_timeout',
         });
+
+        if (order.telegramUserId) {
+          const msgTimeout = `Mohon maaf, garansi Anda sudah hangus karena waktu pengiriman bukti telah habis.`;
+          bot.telegram.sendMessage(order.telegramUserId, msgTimeout).catch(() => {});
+        }
       }
     }
 
-    // 2. Check orders waiting for Admin response > busyTimeoutMins (10 mins default)
+    // 2. Check orders waiting for Admin response > busyTimeoutSec
     const snapshot = await db.collection('orders')
       .where('warrantyClaimStatus', '==', 'pending_admin')
       .where('adminBusyNotified', '==', false)
@@ -299,12 +330,7 @@ async function checkPendingWarrantyAdminBusyTimeouts(bot) {
 
         if (order.telegramUserId) {
           const jamKirim = order.proofReceivedAt || `${formatDateID(receivedMs).timeStr} WIB (${formatDateID(receivedMs).dateStr})`;
-          const defaultMsg =
-            `Mohon maaf ya kak\n` +
-            `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
-            `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
-            `Jadi claim kamu tetap kami proses ya.\n\n` +
-            `Mohon ditunggu sebentar 🙏`;
+          const defaultMsg = `Mohon maaf, admin kemungkinan sedang sibuk. Namun, kami akan tetap memproses klaim Anda. Silakan menunggu.`;
 
           const template = storeSettings.adminBusyMessageTemplate || defaultMsg;
           const autoMsg = template
@@ -324,10 +350,10 @@ async function checkPendingWarrantyAdminBusyTimeouts(bot) {
  * Setup Warranty & Renew Handlers
  */
 function registerWarrantyRenewHandlers(bot) {
-  // Start background timer for 10-minute admin busy notification (runs every 60 seconds)
+  // Start background timer for admin busy & proof timeout notifications (runs every 5 seconds)
   setInterval(() => {
     checkPendingWarrantyAdminBusyTimeouts(bot);
-  }, 60000);
+  }, 5000);
 
   // ═══════════════════════════════════════
   // USER: RENEW HANDLERS
@@ -570,10 +596,67 @@ function registerWarrantyRenewHandlers(bot) {
     }
   });
 
+  bot.action(/^render_order_detail_(.+)$/, async (ctx) => {
+    const orderId = ctx.match[1];
+    ctx.answerCbQuery().catch(() => {});
+    return renderOrderDetail(ctx, orderId);
+  });
+
+  // Click "Batal Klaim" button -> Show Confirmation Modal
   bot.action(/^cancel_warranty_user_(.+)$/, async (ctx) => {
     const orderId = ctx.match[1];
-    ctx.answerCbQuery('✕ Dibatalkan.').catch(() => {});
-    return renderOrderDetail(ctx, orderId);
+    ctx.answerCbQuery().catch(() => {});
+
+    const msg =
+      `<b>⚠️ KONFIRMASI BATAL KLAIM GARANSI</b>\n` +
+      `────────────────────────────\n` +
+      `Apakah Anda yakin ingin membatalkan klaim garansi?\n\n` +
+      `⚠️ <b>Perhatian:</b> <i>Jika dibatalkan, maka garansi Anda akan otomatis <b>hangus</b> dan tidak dapat diklaim kembali.</i>`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('⚠️ Ya, Batalkan Klaim', `confirm_cancel_warranty_${orderId}`),
+        Markup.button.callback('◀️ Kembali', `render_order_detail_${orderId}`),
+      ],
+    ]);
+
+    return safeEditMessage(ctx, msg, keyboard);
+  });
+
+  // User confirms cancellation of warranty claim
+  bot.action(/^confirm_cancel_warranty_(.+)$/, async (ctx) => {
+    const orderId = ctx.match[1];
+    const userId = ctx.from.id;
+    ctx.answerCbQuery('✕ Klaim Garansi Dibatalkan.').catch(() => {});
+
+    const session = userWarrantySessions.get(userId);
+    if (session && session.timer) {
+      clearTimeout(session.timer);
+    }
+    userWarrantySessions.delete(userId);
+
+    try {
+      await db.collection('orders').doc(orderId).update({
+        warrantyClaimed: true,
+        warrantyClaimStatus: 'canceled_user',
+        lastWarrantyStatus: 'canceled_user',
+        canceledAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('confirm_cancel_warranty error:', err);
+    }
+
+    const cancelMsg =
+      `<b>⚠️ KLAIM GARANSI DIBATALKAN</b>\n` +
+      `────────────────────────────\n` +
+      `Klaim garansi untuk order <code>${escapeHTML(orderId)}</code> telah dibatalkan.\n` +
+      `Mohon maaf, garansi Anda sudah hangus dan tidak dapat diklaim kembali.`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('⬅️ Kembali ke Detail Pesanan', `render_order_detail_${orderId}`)],
+    ]);
+
+    return safeEditMessage(ctx, cancelMsg, keyboard);
   });
 
   // User selects issue type
@@ -602,7 +685,7 @@ function registerWarrantyRenewHandlers(bot) {
     const keyboard = Markup.inlineKeyboard([
       [
         Markup.button.callback('➡️ Lanjutkan Upload Bukti', `start_upload_photos_${orderId}`),
-        Markup.button.callback('✕ Batal', `cancel_warranty_user_${orderId}`),
+        Markup.button.callback('✕ Batal Klaim', `cancel_warranty_user_${orderId}`),
       ],
     ]);
 
@@ -649,7 +732,7 @@ function registerWarrantyRenewHandlers(bot) {
         `<b>✅ LAPORAN GARANSI TERSAMPAIKAN${isAutoSubmit ? ' (OTOMATIS)' : ''}</b>\n` +
         `────────────────────────────\n` +
         `Laporan kendala (<b>${escapeHTML(session.issueType || 'Kendala')}</b>) beserta ${session.photos.length} foto bukti untuk order <code>${escapeHTML(orderId)}</code> telah dikirimkan ke Admin.\n\n` +
-        `🕒 <i>Bukti Anda telah diterima pada <b>${jamKirim}</b>.${isAutoSubmit ? ' (Otomatis terkirim setelah 5 menit)' : ''}</i>\n` +
+        `🕒 <i>Bukti Anda telah diterima pada <b>${jamKirim}</b>.${isAutoSubmit ? ' (Otomatis terkirim dari bukti yang ada)' : ''}</i>\n` +
         `<i>Admin akan meninjau laporan dan memberikan respon / akun pengganti secepatnya.</i>`;
 
       if (session.promptMsgId) {
@@ -704,9 +787,10 @@ function registerWarrantyRenewHandlers(bot) {
 
     const userId = ctx.from.id;
     const storeSettings = await getStoreSettings();
-    const uploadTimeoutMins = Number(storeSettings.warrantyUploadTimeoutMinutes || 5);
+    const uploadTimeoutSec = Number(storeSettings.warrantyUploadTimeoutSeconds || (storeSettings.warrantyUploadTimeoutMinutes ? storeSettings.warrantyUploadTimeoutMinutes * 60 : 300));
+    const uploadTimeoutStr = formatTimeoutDuration(uploadTimeoutSec);
     const nowMs = Date.now();
-    const uploadDeadlineAt = nowMs + (uploadTimeoutMins * 60 * 1000);
+    const uploadDeadlineAt = nowMs + (uploadTimeoutSec * 1000);
 
     const session = userWarrantySessions.get(userId) || { orderId, issueType: 'Kendala', photos: [] };
     if (session.timer) clearTimeout(session.timer);
@@ -714,7 +798,8 @@ function registerWarrantyRenewHandlers(bot) {
     session.awaitingPhotos = true;
     session.promptMsgId = ctx.callbackQuery?.message?.message_id;
     session.uploadDeadlineAt = uploadDeadlineAt;
-    session.uploadTimeoutMins = uploadTimeoutMins;
+    session.uploadTimeoutSec = uploadTimeoutSec;
+    session.uploadTimeoutStr = uploadTimeoutStr;
 
     // Background timer to auto-submit uploaded photos or expire session
     session.timer = setTimeout(async () => {
@@ -733,15 +818,17 @@ function registerWarrantyRenewHandlers(bot) {
           });
         } catch (e) {}
 
-        const msgTimeout =
-          `<b>⚠️ KLAIM GARANSI HANGUS (TIMEOUT)</b>\n` +
-          `────────────────────────────\n` +
-          `Batas waktu pengiriman bukti garansi (${uploadTimeoutMins} menit) telah habis.\n` +
-          `Klaim garansi untuk order <code>${escapeHTML(orderId)}</code> hangus.`;
+        const msgTimeout = `Mohon maaf, garansi Anda sudah hangus karena waktu pengiriman bukti telah habis.`;
 
-        bot.telegram.sendMessage(userId, msgTimeout, { parse_mode: 'HTML' }).catch(() => {});
+        if (activeSession.promptMsgId) {
+          bot.telegram.editMessageText(userId, activeSession.promptMsgId, null, msgTimeout).catch(() => {
+            bot.telegram.sendMessage(userId, msgTimeout).catch(() => {});
+          });
+        } else {
+          bot.telegram.sendMessage(userId, msgTimeout).catch(() => {});
+        }
       }
-    }, uploadTimeoutMins * 60 * 1000);
+    }, uploadTimeoutSec * 1000);
 
     userWarrantySessions.set(userId, session);
 
@@ -757,14 +844,14 @@ function registerWarrantyRenewHandlers(bot) {
       `<b>📸 SILAKAN KIRIM FOTO BUKTI KENDALA</b>\n` +
       `────────────────────────────\n` +
       `Silakan kirimkan 1 s/d 5 foto screenshot kendala Anda langsung ke bot ini.\n\n` +
-      `⏳ <b>Batas Waktu Unggah Bukti:</b> <b>${uploadTimeoutMins} Menit</b>\n` +
-      `⚠️ <i>Jika melebihi batas waktu ${uploadTimeoutMins} menit, klaim garansi Anda akan di-submit secara otomatis dari foto yang terkumpul.</i>\n\n` +
+      `⏳ <b>Batas Waktu Kirim Bukti:</b> <b>${uploadTimeoutStr}</b>\n` +
+      `⚠️ <i>Jika Anda tidak mengirim bukti dalam waktu ${uploadTimeoutStr}, garansi Anda akan otomatis hangus.</i>\n\n` +
       `• Foto Terkumpul: <b>${session.photos.length}/5</b>\n\n` +
       `<i>Setelah selesai mengirim foto, tekan tombol <b>"✅ Selesai Upload Bukti"</b> di bawah.</i>`;
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('✅ Selesai Upload Bukti', `finish_warranty_claim_${orderId}`)],
-      [Markup.button.callback('✕ Batal', `cancel_warranty_user_${orderId}`)],
+      [Markup.button.callback('✕ Batal Klaim', `cancel_warranty_user_${orderId}`)],
     ]);
 
     return safeEditMessage(ctx, msg, keyboard);
@@ -851,14 +938,14 @@ function registerWarrantyRenewHandlers(bot) {
           });
         } catch (e) {}
 
-        const msgTimeout =
-          `<b>⚠️ KLAIM GARANSI HANGUS (TIMEOUT)</b>\n` +
-          `────────────────────────────\n` +
-          `Batas waktu pengiriman bukti garansi (${session.uploadTimeoutMins || 5} menit) telah habis.\n` +
-          `Klaim garansi untuk order <code>${escapeHTML(session.orderId)}</code> hangus dan tidak dapat diajukan kembali.`;
+        const msgTimeout = `Mohon maaf, garansi Anda sudah hangus karena waktu pengiriman bukti telah habis.`;
 
         if (session.promptMsgId) {
-          bot.telegram.editMessageText(userId, session.promptMsgId, null, msgTimeout, { parse_mode: 'HTML' }).catch(() => {});
+          bot.telegram.editMessageText(userId, session.promptMsgId, null, msgTimeout).catch(() => {
+            bot.telegram.sendMessage(userId, msgTimeout).catch(() => {});
+          });
+        } else {
+          bot.telegram.sendMessage(userId, msgTimeout).catch(() => {});
         }
         return;
       }
@@ -867,17 +954,19 @@ function registerWarrantyRenewHandlers(bot) {
         session.photos.push(largestPhoto);
         userWarrantySessions.set(userId, session);
 
+        const timeoutLabel = session.uploadTimeoutStr || formatTimeoutDuration(session.uploadTimeoutSec || 300);
+
         const msg =
           `<b>📸 SILAKAN KIRIM FOTO BUKTI KENDALA</b>\n` +
           `────────────────────────────\n` +
           `Silakan kirimkan 1 s/d 5 foto screenshot kendala Anda langsung ke bot ini.\n\n` +
-          `⏳ <b>Batas Waktu Kirim Bukti:</b> <b>${session.uploadTimeoutMins || 5} Menit</b>\n` +
+          `⏳ <b>Batas Waktu Kirim Bukti:</b> <b>${timeoutLabel}</b>\n` +
           `• Foto Terkumpul: <b>${session.photos.length}/5 foto diterima ✅</b>\n\n` +
           `<i>Setelah selesai mengirim foto, tekan tombol <b>"✅ Selesai Upload Bukti"</b> di bawah.</i>`;
 
         const keyboard = Markup.inlineKeyboard([
           [Markup.button.callback('✅ Selesai Upload Bukti', `finish_warranty_claim_${session.orderId}`)],
-          [Markup.button.callback('✕ Batal', `cancel_warranty_user_${session.orderId}`)],
+          [Markup.button.callback('✕ Batal Klaim', `cancel_warranty_user_${session.orderId}`)],
         ]);
 
         if (session.promptMsgId) {

@@ -12,14 +12,10 @@
   let requiredChannelId = $state('');
   let requiredChannelLink = $state('');
 
-  let warrantyUploadTimeoutMinutes = $state(5);
-  let adminProcessBusyTimeoutMinutes = $state(10);
+  let warrantyUploadTimeoutSeconds = $state(300);
+  let adminProcessBusyTimeoutSeconds = $state(600);
   let adminBusyMessageTemplate = $state(
-    `Mohon maaf ya kak\n` +
-    `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
-    `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
-    `Jadi claim kamu tetap kami proses ya.\n\n` +
-    `Mohon ditunggu sebentar 🙏`
+    `Mohon maaf, admin kemungkinan sedang sibuk. Namun, kami akan tetap memproses klaim Anda. Silakan menunggu.`
   );
 
   // Nota Settings
@@ -51,14 +47,12 @@
       mustJoinEnabled = settingsRes.data.mustJoinEnabled !== false;
       requiredChannelId = settingsRes.data.requiredChannelId || '';
       requiredChannelLink = settingsRes.data.requiredChannelLink || '';
-      warrantyUploadTimeoutMinutes = settingsRes.data.warrantyUploadTimeoutMinutes || 5;
-      adminProcessBusyTimeoutMinutes = settingsRes.data.adminProcessBusyTimeoutMinutes || 10;
+      
+      warrantyUploadTimeoutSeconds = settingsRes.data.warrantyUploadTimeoutSeconds || (settingsRes.data.warrantyUploadTimeoutMinutes ? settingsRes.data.warrantyUploadTimeoutMinutes * 60 : 300);
+      adminProcessBusyTimeoutSeconds = settingsRes.data.adminProcessBusyTimeoutSeconds || (settingsRes.data.adminProcessBusyTimeoutMinutes ? settingsRes.data.adminProcessBusyTimeoutMinutes * 60 : 600);
+      
       adminBusyMessageTemplate = settingsRes.data.adminBusyMessageTemplate || (
-        `Mohon maaf ya kak\n` +
-        `Claim garansi untuk order {{order_id}} belum bisa kami proses sekarang karena admin sedang sibuk.\n\n` +
-        `Tapi tenang aja, bukti kamu sudah kami terima pada {{jam_kirim}} dan masih dalam waktu garansi.\n` +
-        `Jadi claim kamu tetap kami proses ya.\n\n` +
-        `Mohon ditunggu sebentar 🙏`
+        `Mohon maaf, admin kemungkinan sedang sibuk. Namun, kami akan tetap memproses klaim Anda. Silakan menunggu.`
       );
 
       enableNotaImage = settingsRes.data.enableNotaImage !== false;
@@ -89,8 +83,10 @@
       body: JSON.stringify({ 
         storeName, storeLogoUrl, botToken, contactWhatsapp, contactTelegram, groupTelegram, 
         mustJoinEnabled, requiredChannelId, requiredChannelLink,
-        warrantyUploadTimeoutMinutes: Number(warrantyUploadTimeoutMinutes || 5),
-        adminProcessBusyTimeoutMinutes: Number(adminProcessBusyTimeoutMinutes || 10),
+        warrantyUploadTimeoutSeconds: Number(warrantyUploadTimeoutSeconds || 300),
+        warrantyUploadTimeoutMinutes: Math.ceil(Number(warrantyUploadTimeoutSeconds || 300) / 60),
+        adminProcessBusyTimeoutSeconds: Number(adminProcessBusyTimeoutSeconds || 600),
+        adminProcessBusyTimeoutMinutes: Math.ceil(Number(adminProcessBusyTimeoutSeconds || 600) / 60),
         adminBusyMessageTemplate,
         enableNotaImage, notaStoreName, notaLogoUrl, notaBgColor, notaAccentColor, notaFooterText
       })
@@ -107,31 +103,73 @@
       <p class="text-[11px] text-slate-400">Atur batas waktu pengiriman bukti customer dan notifikasi otomatis saat Admin belum memproses klaim garansi.</p>
     </div>
 
-    <div class="space-y-3">
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="text-xs text-slate-400 font-semibold block mb-1">⏰ Batas Kirim Bukti</label>
-          <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-            <input type="number" min="1" max="60" bind:value={warrantyUploadTimeoutMinutes} class="w-full bg-transparent text-xs text-amber-400 font-bold focus:outline-none">
-            <span class="text-[11px] text-slate-400">menit</span>
-          </div>
-          <span class="text-[10px] text-slate-500 block mt-0.5">Setelah klik tombol garansi.</span>
+    <div class="space-y-4">
+      <!-- 1. Batas Kirim Bukti -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+        <label class="text-xs text-amber-400 font-semibold flex items-center justify-between">
+          <span>⏰ Batas Waktu Kirim Bukti</span>
+          <span class="text-[10px] text-slate-400 font-mono">
+            {#if warrantyUploadTimeoutSeconds < 60}
+              {warrantyUploadTimeoutSeconds} detik
+            {:else if warrantyUploadTimeoutSeconds % 3600 === 0}
+              {warrantyUploadTimeoutSeconds / 3600} jam
+            {:else}
+              {Math.round(warrantyUploadTimeoutSeconds / 60)} menit
+            {/if}
+          </span>
+        </label>
+        
+        <!-- Presets -->
+        <div class="flex items-center gap-1.5 text-[11px]">
+          <span class="text-slate-500 text-[10px]">Preset:</span>
+          <button type="button" onclick={() => warrantyUploadTimeoutSeconds = 10} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {warrantyUploadTimeoutSeconds === 10 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">10s</button>
+          <button type="button" onclick={() => warrantyUploadTimeoutSeconds = 25} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {warrantyUploadTimeoutSeconds === 25 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">25s</button>
+          <button type="button" onclick={() => warrantyUploadTimeoutSeconds = 60} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {warrantyUploadTimeoutSeconds === 60 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">1m</button>
+          <button type="button" onclick={() => warrantyUploadTimeoutSeconds = 3600} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {warrantyUploadTimeoutSeconds === 3600 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">1h</button>
         </div>
 
-        <div>
-          <label class="text-xs text-slate-400 font-semibold block mb-1">⏳ Notif Admin Sibuk</label>
-          <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-            <input type="number" min="1" max="120" bind:value={adminProcessBusyTimeoutMinutes} class="w-full bg-transparent text-xs text-sky-400 font-bold focus:outline-none">
-            <span class="text-[11px] text-slate-400">menit</span>
-          </div>
-          <span class="text-[10px] text-slate-500 block mt-0.5">Jika admin belum merespon.</span>
+        <div class="flex items-center gap-2 pt-1">
+          <input type="number" min="1" bind:value={warrantyUploadTimeoutSeconds} class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-amber-400 font-bold focus:outline-none focus:border-amber-500">
+          <span class="text-[11px] text-slate-400 shrink-0">Detik</span>
         </div>
+        <span class="text-[10px] text-slate-500 block">Dihitung setelah customer memilih alasan kendala.</span>
+      </div>
+
+      <!-- 2. Waktu Respon Admin -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+        <label class="text-xs text-sky-400 font-semibold flex items-center justify-between">
+          <span>⏳ Batas Waktu Respon Admin</span>
+          <span class="text-[10px] text-slate-400 font-mono">
+            {#if adminProcessBusyTimeoutSeconds < 60}
+              {adminProcessBusyTimeoutSeconds} detik
+            {:else if adminProcessBusyTimeoutSeconds % 3600 === 0}
+              {adminProcessBusyTimeoutSeconds / 3600} jam
+            {:else}
+              {Math.round(adminProcessBusyTimeoutSeconds / 60)} menit
+            {/if}
+          </span>
+        </label>
+        
+        <!-- Presets -->
+        <div class="flex items-center gap-1.5 text-[11px]">
+          <span class="text-slate-500 text-[10px]">Preset:</span>
+          <button type="button" onclick={() => adminProcessBusyTimeoutSeconds = 10} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {adminProcessBusyTimeoutSeconds === 10 ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">10s</button>
+          <button type="button" onclick={() => adminProcessBusyTimeoutSeconds = 25} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {adminProcessBusyTimeoutSeconds === 25 ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">25s</button>
+          <button type="button" onclick={() => adminProcessBusyTimeoutSeconds = 60} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {adminProcessBusyTimeoutSeconds === 60 ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">1m</button>
+          <button type="button" onclick={() => adminProcessBusyTimeoutSeconds = 3600} class="px-2 py-0.5 rounded-lg border text-[10px] font-mono transition-colors {adminProcessBusyTimeoutSeconds === 3600 ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}">1h</button>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="number" min="1" bind:value={adminProcessBusyTimeoutSeconds} class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-sky-400 font-bold focus:outline-none focus:border-sky-500">
+          <span class="text-[11px] text-slate-400 shrink-0">Detik</span>
+        </div>
+        <span class="text-[10px] text-slate-500 block">Pesan dikirim jika admin belum memproses bukti klaim garansi.</span>
       </div>
 
       <div>
         <label class="text-xs text-slate-400 font-semibold block mb-1">💬 Template Pesan Admin Sibuk</label>
-        <textarea rows="5" bind:value={adminBusyMessageTemplate} placeholder="Template pesan otomatis..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:border-sky-500 focus:outline-none resize-y font-mono"></textarea>
-        <span class="text-[10px] text-sky-400/80 block mt-1">Gunakan tag: <code>&#123;&#123;order_id&#125;&#125;</code> dan <code>&#123;&#123;jam_kirim&#125;&#125;</code></span>
+        <textarea rows="4" bind:value={adminBusyMessageTemplate} placeholder="Template pesan otomatis..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:border-sky-500 focus:outline-none resize-y font-mono"></textarea>
+        <span class="text-[10px] text-sky-400/80 block mt-1">Gunakan tag: <code>&#123;&#123;order_id&#125;&#125;</code> dan <code>&#123;&#123;jam_kirim&#125;&#125;</code> jika diperlukan</span>
       </div>
     </div>
   </div>

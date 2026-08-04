@@ -34,9 +34,11 @@ async function showOrderSummary(ctx, productId, variantIndex) {
       .where('isUsed', '==', false)
       .get();
 
-    const availableStock = (Boolean(product.requiresEmail) || Boolean(variant.inviteEnabled))
+    const isReqEmail = Boolean(product.requiresEmail || variant.inviteEnabled);
+    const availableStock = isReqEmail
       ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
-      : poolSnap.size;
+      : ((poolSnap.size > 0 || variant.stock === undefined || variant.stock === null) ? poolSnap.size : Number(variant.stock || 0));
+
     if (availableStock <= 0) {
       return ctx.answerCbQuery(stripHTMLTags(t(lang, 'product_out_of_stock')), { show_alert: true }).catch(() => {});
     }
@@ -100,16 +102,15 @@ async function renderOrderSummary(ctx, cart, lang, isEdit = true) {
         const prodData = prodDoc.data();
         const variantObj = prodData.variants?.[cart.variantIndex] || prodData.variants?.[0];
         if (variantObj) {
-          if (prodData.requiresEmail || variantObj.inviteEnabled) {
-            sisaStok = Number(variantObj.stock || 0);
-          } else {
-            const poolSnap = await db.collection('credentials_pool')
-              .where('productId', '==', cart.productId)
-              .where('variantLabel', '==', cart.variantLabel)
-              .where('isUsed', '==', false)
-              .get();
-            sisaStok = poolSnap.size;
-          }
+          const isReqEmail = Boolean(prodData.requiresEmail || variantObj.inviteEnabled);
+          const poolSnap = await db.collection('credentials_pool')
+            .where('productId', '==', cart.productId)
+            .where('variantLabel', '==', cart.variantLabel)
+            .where('isUsed', '==', false)
+            .get();
+          sisaStok = isReqEmail
+            ? ((variantObj.stock !== undefined && variantObj.stock !== null) ? Number(variantObj.stock) : 0)
+            : ((poolSnap.size > 0 || variantObj.stock === undefined || variantObj.stock === null) ? poolSnap.size : Number(variantObj.stock || 0));
         }
       }
 
@@ -215,17 +216,16 @@ async function adjustQuantity(ctx, change) {
     if (!variant) return ctx.answerCbQuery('Varian tidak ditemukan.', { show_alert: true }).catch(() => {});
 
     // Calculate actual available stock
-    let maxStock = 0;
-    if (Boolean(product.requiresEmail)) {
-      maxStock = (variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0;
-    } else {
-      const poolSnap = await db.collection('credentials_pool')
-        .where('productId', '==', cart.productId)
-        .where('variantLabel', '==', variant.label)
-        .where('isUsed', '==', false)
-        .get();
-      maxStock = poolSnap.size;
-    }
+    const isReqEmail = Boolean(product.requiresEmail || variant.inviteEnabled);
+    const poolSnap = await db.collection('credentials_pool')
+      .where('productId', '==', cart.productId)
+      .where('variantLabel', '==', variant.label)
+      .where('isUsed', '==', false)
+      .get();
+
+    const maxStock = isReqEmail
+      ? ((variant.stock !== undefined && variant.stock !== null) ? Number(variant.stock) : 0)
+      : ((poolSnap.size > 0 || variant.stock === undefined || variant.stock === null) ? poolSnap.size : Number(variant.stock || 0));
 
     if (maxStock <= 0) {
       return ctx.answerCbQuery(stripHTMLTags(t(lang, 'product_out_of_stock')), { show_alert: true }).catch(() => {});

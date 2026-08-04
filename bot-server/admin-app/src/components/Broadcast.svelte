@@ -4,11 +4,19 @@
   let variant = $state('RESTOCK');
   let isPng = $state(true);
   let apkLogoUrl = $state('');
-  let productName = $state('');
-  let duration = $state('');
-  let keterangan = $state('');
-  let price = $state('');
-  let freshBilling = $state('');
+  let productName = $state('CAPCUT PRO FAMHEAD');
+  let duration = $state('7 HARI');
+  let keterangan = $state('Bulk 10 Team');
+  let stockCount = $state('2 pcs');
+  let price = $state('Rp35.000');
+  let bulkPrice1 = $state('Rp30.000');
+  let bulkPrice2 = $state('Rp25.000');
+  let freshBilling = $state('04 Agustus 2026');
+  let bonusInfo = $state('Bonus Capcut Pro Indplan 30 Hari [ Hasil Give ]');
+  let footerText = $state('📩 Langsung PM sekarang juga!\nBuruan order sekarang sebelum stock habis! 🚀');
+
+  let restockImage = $state('');
+  let restockImagePreview = $state('');
   let mediaUrl = $state('');
   let mediaType = $state('auto');
 
@@ -26,15 +34,39 @@
     }
   });
 
+  function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      restockImage = evt.target.result;
+      restockImagePreview = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeRestockImage() {
+    restockImage = '';
+    restockImagePreview = '';
+  }
+
   // Computed text preview
   function getPreviewText() {
     if (variant === 'RESTOCK') {
-      if (isPng) {
-        return `♻️ RESTOCK TERSEDIA!\n\n📦 Produk : ${productName || '{Nama Produk}'}\n⏳ Durasi : ${duration || '{Durasi}'}\n📌 Keterangan : ${keterangan || '{Keterangan}'}\n💰 Harga : ${price || '{Harga}'}\n🆕 Fresh Billing : ${freshBilling || '{Tanggal}'}`;
-      } else {
-        const linkStr = apkLogoUrl.trim() ? `\n🔗 Link Ikon Aplikasi: ${apkLogoUrl.trim()}\n` : '\n';
-        return `♻️ RESTOCK TERSEDIA!\n${linkStr}\n📦 Produk : ${productName || '{Nama Produk}'}\n⏳ Durasi : ${duration || '{Durasi}'}\n📌 Keterangan : ${keterangan || '{Keterangan}'}\n💰 Harga : ${price || '{Harga}'}\n🆕 Fresh Billing : ${freshBilling || '{Tanggal}'}`;
-      }
+      const lines = ['♻️ RESTOCK TERSEDIA!\n'];
+      if (productName) lines.push(`📦 Produk : ${productName}`);
+      if (duration) lines.push(`⏳ Durasi : ${duration}`);
+      if (keterangan) lines.push(`📌 Keterangan : ${keterangan}`);
+      if (stockCount) lines.push(`📊 Stock: ${stockCount}`);
+      if (price) lines.push(`💰 Harga : ${price}`);
+      if (bulkPrice1) lines.push(`💰 Bulk 3 : ${bulkPrice1}`);
+      if (bulkPrice2) lines.push(`💰 Bulk 5 : ${bulkPrice2}`);
+      if (freshBilling) lines.push(`🆕 Fresh Billing : ${freshBilling}`);
+      if (bonusInfo) lines.push(bonusInfo);
+
+      const footer = footerText ? footerText : '📩 Langsung PM sekarang juga!\nBuruan order sekarang sebelum stock habis! 🚀';
+      lines.push('\n' + footer);
+      return lines.join('\n');
     } else if (variant === 'PERUBAHAN_HARGA') {
       return `📢 PERUBAHAN HARGA\n\n📦 Produk : ${productName || '{Nama Produk}'}\n⏳ Durasi : ${duration || '{Durasi}'}\n💰 Harga Baru : ${price || '{Harga}'}\n\n📌 Catatan:\nHarga telah diperbarui, silakan cek sebelum order.`;
     } else if (variant === 'DISKON') {
@@ -75,8 +107,14 @@
           productName,
           duration,
           keterangan,
+          stockCount,
           price,
+          bulkPrice1,
+          bulkPrice2,
           freshBilling,
+          bonusInfo,
+          footerText,
+          restockImage,
           mediaUrl,
           mediaType,
           sendToChannel,
@@ -110,7 +148,7 @@
         <span class="p-2 rounded-xl bg-gradient-to-br from-violet-600/30 to-indigo-600/30 border border-violet-500/40 text-violet-400">📢</span>
         Kirim Broadcast Pesan
       </h2>
-      <p class="text-xs text-slate-400 mt-1">Buat dan kirim pengumuman restock, promo, atau info penting ke Telegram.</p>
+      <p class="text-xs text-slate-400 mt-1">Buat dan kirim pengumuman restock (dengan auto watermark logo di pojok kiri atas), promo, atau info penting ke Telegram.</p>
     </div>
   </div>
 
@@ -150,56 +188,50 @@
         </select>
       </div>
 
-      <!-- Mode Tampilan Toggle (Only RESTOCK) -->
+      <!-- Upload Gambar Restock (RESTOCK Mode) -->
       {#if variant === 'RESTOCK'}
-        <div class="p-4 rounded-xl bg-slate-950 border border-indigo-900/40 space-y-2">
+        <div class="p-4 rounded-xl bg-slate-950 border border-indigo-900/40 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-              🖼️ Mode PNG (Gambar Neon Template)
+              🖼️ Upload Gambar Restock / Bukti Screenshot
             </span>
-            <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-sky-400 font-semibold">✨ Auto Logo di Pojok Kiri Atas</span>
+          </div>
+
+          {#if restockImagePreview}
+            <div class="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900 group">
+              <img src={restockImagePreview} alt="Restock Upload" class="w-full max-h-56 object-contain bg-slate-950" />
+              <!-- Auto logo overlay preview indicator -->
+              <div class="absolute top-2 left-2 p-1 bg-black/60 backdrop-blur-md rounded-full border border-sky-400/50 shadow-lg">
+                <img src="/logo.png" alt="Logo" class="w-8 h-8 rounded-full" />
+              </div>
               <button
                 type="button"
-                onclick={() => isPng = true}
-                class="px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer {isPng ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30' : 'text-slate-400 hover:text-white'}"
+                onclick={removeRestockImage}
+                class="absolute bottom-2 right-2 px-3 py-1.5 bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold rounded-lg shadow-lg transition-all"
               >
-                ◉ ON (PNG)
-              </button>
-              <button
-                type="button"
-                onclick={() => isPng = false}
-                class="px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer {!isPng ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}"
-              >
-                OFF (TEXT)
+                🗑️ Hapus Gambar
               </button>
             </div>
-          </div>
-          <p class="text-[11px] text-slate-400 italic">
-            {#if isPng}
-              📌 Gambar kartu neon futuristik (restock.jpg) akan di-generate otomatis dengan ikon & detail produk!
-            {:else}
-              📌 Broadcast dikirim dalam bentuk Teks biasa.
-            {/if}
-          </p>
-        </div>
-      {/if}
+          {:else}
+            <label class="flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed border-slate-800 hover:border-sky-500/60 bg-slate-900/50 cursor-pointer transition-all">
+              <span class="text-2xl mb-1">📸</span>
+              <span class="text-xs font-bold text-slate-300">Pilih / Upload Gambar Restock</span>
+              <span class="text-[11px] text-slate-500 mt-0.5">Format JPG, PNG, WEBP — Logo Toko otomatis terpasang di kiri atas</span>
+              <input type="file" accept="image/*" onchange={handleImageUpload} class="hidden" />
+            </label>
+          {/if}
 
-      <!-- Link Ikon APK (RESTOCK + PNG ON / RESTOCK TEXT) -->
-      {#if variant === 'RESTOCK'}
-        <div class="space-y-1.5">
-          <label for="broadcast-apk-logo-url" class="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>Link Ikon APK <span class="text-slate-400 font-normal">(opsional)</span></span>
-            {#if isPng}
-              <span class="text-[10px] text-sky-400 font-medium">Digunakan pada Mode PNG</span>
-            {/if}
-          </label>
-          <input
-            id="broadcast-apk-logo-url"
-            type="url"
-            bind:value={apkLogoUrl}
-            placeholder="https://example.com/logo.png"
-            class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs font-mono transition-all outline-none"
-          />
+          <!-- Media URL fallback option -->
+          <div class="space-y-1 pt-1">
+            <span class="text-[11px] text-slate-400">Atau masukkan Link URL Gambar Restock:</span>
+            <input
+              type="url"
+              bind:value={mediaUrl}
+              placeholder="https://example.com/screenshot.jpg"
+              class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3 py-2 text-xs font-mono transition-all outline-none"
+            />
+          </div>
         </div>
       {/if}
 
@@ -212,7 +244,7 @@
             id="broadcast-product-name"
             type="text"
             bind:value={productName}
-            placeholder="Contoh: NETFLIX PREMIUM 4K"
+            placeholder="Contoh: CAPCUT PRO FAMHEAD"
             class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
           />
         </div>
@@ -225,7 +257,21 @@
               id="broadcast-duration"
               type="text"
               bind:value={duration}
-              placeholder="Contoh: 1 BULAN"
+              placeholder="Contoh: 7 HARI"
+              class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
+            />
+          </div>
+        {/if}
+
+        <!-- Stok Count (Restock) -->
+        {#if variant === 'RESTOCK'}
+          <div class="space-y-1.5">
+            <label for="broadcast-stock" class="text-xs font-semibold text-slate-300">Jumlah Stok</label>
+            <input
+              id="broadcast-stock"
+              type="text"
+              bind:value={stockCount}
+              placeholder="Contoh: 2 pcs"
               class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
             />
           </div>
@@ -235,13 +281,39 @@
         {#if variant !== 'INFO_PENTING'}
           <div class="space-y-1.5">
             <label for="broadcast-price" class="text-xs font-semibold text-slate-300">
-              {variant === 'PERUBAHAN_HARGA' ? 'Harga Baru' : variant === 'DISKON' ? 'Harga Promo' : 'Harga'}
+              {variant === 'PERUBAHAN_HARGA' ? 'Harga Baru' : variant === 'DISKON' ? 'Harga Promo' : 'Harga Ecer'}
             </label>
             <input
               id="broadcast-price"
               type="text"
               bind:value={price}
-              placeholder="Contoh: Rp 35.000"
+              placeholder="Contoh: Rp35.000"
+              class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
+            />
+          </div>
+        {/if}
+
+        <!-- Harga Bulk 3 (Restock) -->
+        {#if variant === 'RESTOCK'}
+          <div class="space-y-1.5">
+            <label for="broadcast-bulk1" class="text-xs font-semibold text-slate-300">Harga Bulk 3 <span class="text-slate-500 font-normal">(opsional)</span></label>
+            <input
+              id="broadcast-bulk1"
+              type="text"
+              bind:value={bulkPrice1}
+              placeholder="Contoh: Rp30.000"
+              class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
+            />
+          </div>
+
+          <!-- Harga Bulk 5 (Restock) -->
+          <div class="space-y-1.5">
+            <label for="broadcast-bulk2" class="text-xs font-semibold text-slate-300">Harga Bulk 5 <span class="text-slate-500 font-normal">(opsional)</span></label>
+            <input
+              id="broadcast-bulk2"
+              type="text"
+              bind:value={bulkPrice2}
+              placeholder="Contoh: Rp25.000"
               class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
             />
           </div>
@@ -255,7 +327,7 @@
               id="broadcast-fresh-billing"
               type="text"
               bind:value={freshBilling}
-              placeholder="Contoh: 01 AGUSTUS 2026"
+              placeholder="Contoh: 04 Agustus 2026"
               class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
             />
           </div>
@@ -268,8 +340,34 @@
         <textarea
           id="broadcast-keterangan"
           bind:value={keterangan}
-          rows="3"
-          placeholder="Tulis keterangan atau detail pengumuman di sini..."
+          rows="2"
+          placeholder="Contoh: Bulk 10 Team..."
+          class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl p-3 text-xs transition-all outline-none"
+        ></textarea>
+      </div>
+
+      <!-- Bonus Info (Restock) -->
+      {#if variant === 'RESTOCK'}
+        <div class="space-y-1.5">
+          <label for="broadcast-bonus" class="text-xs font-semibold text-slate-300">Bonus / Catatan Tambahan <span class="text-slate-500 font-normal">(opsional)</span></label>
+          <input
+            id="broadcast-bonus"
+            type="text"
+            bind:value={bonusInfo}
+            placeholder="Contoh: Bonus Capcut Pro Indplan 30 Hari [ Hasil Give ]"
+            class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl px-3.5 py-2.5 text-xs transition-all outline-none"
+          />
+        </div>
+      {/if}
+
+      <!-- Footer Callout Text -->
+      <div class="space-y-1.5">
+        <label for="broadcast-footer" class="text-xs font-semibold text-slate-300">Pesan Footer Callout</label>
+        <textarea
+          id="broadcast-footer"
+          bind:value={footerText}
+          rows="2"
+          placeholder="Contoh: 📩 Langsung PM sekarang juga! Buruan order sebelum habis!"
           class="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 text-white rounded-xl p-3 text-xs transition-all outline-none"
         ></textarea>
       </div>
@@ -334,15 +432,27 @@
           <span>📑</span> LIVE PREVIEW BROADCAST
         </div>
 
-        {#if variant === 'RESTOCK' && isPng}
-          <div class="my-4 p-3 rounded-xl bg-slate-950 border border-sky-500/30 text-center space-y-2">
-            <span class="text-xs font-bold text-sky-400 flex items-center justify-center gap-1">
-              🖼️ Restock Card PNG Mode
-            </span>
-            <p class="text-[11px] text-slate-400">
-              Pesan akan dikirim sebagai <b>Gambar Kartu PNG Cyber Neon</b> dengan caption teks di bawah:
-            </p>
-          </div>
+        {#if variant === 'RESTOCK'}
+          {#if restockImagePreview}
+            <div class="my-4 relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shadow-md">
+              <img src={restockImagePreview} alt="Live Restock Preview" class="w-full max-h-64 object-cover" />
+              <div class="absolute top-2 left-2 p-1 bg-black/60 backdrop-blur-md rounded-full border border-sky-400/50 shadow-lg">
+                <img src="/logo.png" alt="Logo Watermark" class="w-9 h-9 rounded-full" />
+              </div>
+              <div class="absolute bottom-2 left-2 px-2.5 py-1 bg-slate-900/90 text-sky-400 font-bold text-[10px] rounded-md border border-slate-700">
+                ✨ Auto Logo Top-Left Corner
+              </div>
+            </div>
+          {:else}
+            <div class="my-4 p-3 rounded-xl bg-slate-950 border border-sky-500/30 text-center space-y-2">
+              <span class="text-xs font-bold text-sky-400 flex items-center justify-center gap-1">
+                🖼️ Restock Gambar Custom + Watermark Logo
+              </span>
+              <p class="text-[11px] text-slate-400">
+                Gambar yang diupload akan otomatis dipasangi <b>Logo Toko di Pojok Kiri Atas</b>.
+              </p>
+            </div>
+          {/if}
         {/if}
 
         <div class="bg-[#0b141d] p-4 rounded-xl border border-slate-800 text-slate-200 font-mono text-xs whitespace-pre-wrap leading-relaxed shadow-inner">

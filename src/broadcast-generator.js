@@ -4,11 +4,93 @@ const fs = require('fs');
 const axios = require('axios');
 
 /**
- * Generate RESTOCK PNG image using restock.jpg template
+ * Overlay logo.png on top-right corner of any restock image
+ * @param {Buffer|string} imageInput
+ * @param {object} options
+ * @returns {Promise<Buffer>}
+ */
+async function overlayWatermarkLogo(imageInput, options = {}) {
+  let baseImg;
+  try {
+    if (Buffer.isBuffer(imageInput)) {
+      baseImg = await loadImage(imageInput);
+    } else if (typeof imageInput === 'string' && (imageInput.startsWith('http://') || imageInput.startsWith('https://'))) {
+      const resp = await axios.get(imageInput, { responseType: 'arraybuffer', timeout: 15000 });
+      baseImg = await loadImage(Buffer.from(resp.data));
+    } else if (typeof imageInput === 'string' && imageInput.startsWith('data:image')) {
+      const base64Data = imageInput.split(',')[1];
+      baseImg = await loadImage(Buffer.from(base64Data, 'base64'));
+    } else if (typeof imageInput === 'string' && fs.existsSync(imageInput)) {
+      baseImg = await loadImage(fs.readFileSync(imageInput));
+    } else {
+      const templatePath = path.join(__dirname, '..', 'restock.jpg');
+      if (fs.existsSync(templatePath)) {
+        baseImg = await loadImage(fs.readFileSync(templatePath));
+      } else {
+        throw new Error('Image source not found');
+      }
+    }
+  } catch (err) {
+    console.error('overlayWatermarkLogo base image load error:', err.message);
+    const templatePath = path.join(__dirname, '..', 'restock.jpg');
+    baseImg = await loadImage(fs.readFileSync(templatePath));
+  }
+
+  const canvas = createCanvas(baseImg.width, baseImg.height);
+  const ctx = canvas.getContext('2d');
+
+  // 1. Draw base restock image
+  ctx.drawImage(baseImg, 0, 0);
+
+  // 2. Load logo.png
+  let logoImg;
+  const logoPath = options.logoPath || path.join(__dirname, '..', 'logo.png');
+  if (fs.existsSync(logoPath)) {
+    try {
+      logoImg = await loadImage(fs.readFileSync(logoPath));
+    } catch (e) {}
+  }
+
+  if (logoImg) {
+    const logoSize = options.logoSize || Math.max(60, Math.min(260, Math.round(baseImg.width * 0.16)));
+    const padding = Math.max(10, Math.round(baseImg.width * 0.02));
+
+    const position = options.position || 'top-left';
+    let logoX, logoY;
+
+    if (position === 'top-right') {
+      logoX = baseImg.width - logoSize - padding;
+      logoY = padding;
+    } else { // default: top-left
+      logoX = padding;
+      logoY = padding;
+    }
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 4;
+
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+/**
+ * Generate RESTOCK PNG image using restock.jpg template or uploaded image
  * @param {object} data
  * @returns {Promise<Buffer>}
  */
 async function generateRestockPNG(data = {}) {
+  // If custom restock image is provided (uploaded image or URL), use watermark overlay
+  if (data.restockImage || data.restockImageUrl || data.mediaUrl) {
+    const imgSource = data.restockImage || data.restockImageUrl || data.mediaUrl;
+    return await overlayWatermarkLogo(imgSource, { position: data.logoPosition || 'top-left' });
+  }
+
   const templatePath = path.join(__dirname, '..', 'restock.jpg');
   if (!fs.existsSync(templatePath)) {
     throw new Error('Template restock.jpg tidak ditemukan!');
@@ -22,7 +104,7 @@ async function generateRestockPNG(data = {}) {
   // Draw base template image
   ctx.drawImage(bgImg, 0, 0);
 
-  // 1. Render APK Logo inside top-center frame box (exact coordinates for restock.jpg 1254x1254)
+  // 1. Render APK Logo inside top-center frame box
   const frameX = 364;
   const frameY = 181;
   const frameW = 511;
@@ -53,7 +135,6 @@ async function generateRestockPNG(data = {}) {
       }
       const logoImg = await loadImage(logoSource);
 
-      // Maintain aspect ratio centered inside the frame box
       const imgAspect = (logoImg.width && logoImg.height) ? (logoImg.width / logoImg.height) : 1;
       let drawW = frameW;
       let drawH = frameH;
@@ -76,7 +157,6 @@ async function generateRestockPNG(data = {}) {
   }
 
   if (!logoLoaded) {
-    // Fallback: Gradient background with initial or product name
     const grad = ctx.createLinearGradient(frameX, frameY, frameX + frameW, frameY + frameH);
     grad.addColorStop(0, '#041c38');
     grad.addColorStop(0.5, '#0044aa');
@@ -110,8 +190,8 @@ async function generateRestockPNG(data = {}) {
     { key: 'freshBilling', val: freshBilling, centerY: 1142 },
   ];
 
-  const textStartX = 425; // X position after vertical divider line
-  const maxTextWidth = 720; // Max width before scaling down
+  const textStartX = 425;
+  const maxTextWidth = 720;
 
   fields.forEach(f => {
     let fontSize = 36;
@@ -126,19 +206,16 @@ async function generateRestockPNG(data = {}) {
     ctx.textBaseline = 'middle';
     ctx.font = `bold ${fontSize}px sans-serif`;
 
-    // Auto shrink font size if text overflows maxTextWidth
     while (ctx.measureText(f.val).width > maxTextWidth && fontSize > 16) {
       fontSize -= 2;
       ctx.font = `bold ${fontSize}px sans-serif`;
     }
 
-    // Pass 1: Neon Cyan Glow
     ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
     ctx.shadowBlur = 10;
     ctx.fillStyle = '#00f0ff';
     ctx.fillText(f.val, textStartX, f.centerY);
 
-    // Pass 2: Clean crisp white text fill
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
@@ -147,9 +224,26 @@ async function generateRestockPNG(data = {}) {
     ctx.restore();
   });
 
+  // 3. Stamp logo.png at top-left corner
+  let logoImg;
+  const logoPath = path.join(__dirname, '..', 'logo.png');
+  if (fs.existsSync(logoPath)) {
+    try {
+      logoImg = await loadImage(fs.readFileSync(logoPath));
+      const logoSize = 160;
+      const padding = 24;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = 12;
+      ctx.drawImage(logoImg, padding, padding, logoSize, logoSize);
+      ctx.restore();
+    } catch (e) {}
+  }
+
   return canvas.toBuffer('image/png');
 }
 
 module.exports = {
   generateRestockPNG,
+  overlayWatermarkLogo,
 };
